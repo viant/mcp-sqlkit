@@ -298,10 +298,10 @@ automatically).
 sequenceDiagram
     autonumber
     participant U as User
-    participant C as MCP&nbsp;Client
-    participant S as SQLKit&nbsp;Server
-    participant UI as Browser&nbsp;(UI)
-    participant SS as Secret&nbsp;Store
+    participant C as "MCP Client"
+    participant S as "SQLKit Server"
+    participant UI as "Browser (UI)"
+    participant SS as "Secret Store"
 
     U->>C: dbAddConnection (missing secret)
     C->>S: rpc dbAddConnection
@@ -324,11 +324,11 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant U as User
-    participant C as MCP&nbsp;Client
-    participant S as SQLKit&nbsp;Server
+    participant C as "MCP Client"
+    participant S as "SQLKit Server"
     participant UI as Browser
-    participant OP as OAuth&nbsp;Provider
-    participant SS as Secret&nbsp;Store
+    participant OP as "OAuth Provider"
+    participant SS as "Secret Store"
 
     U->>C: dbAddConnection (BigQuery etc.)
     C->>S: rpc dbAddConnection
