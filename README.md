@@ -48,10 +48,12 @@ distributed as a single self-contained executable (`mcp-sqlkit`).
   local filesystem (`~/.secret/mcpt` by default) or kept in-memory when a
   secret location is not configured.
 
-• **User-interaction flow** – when a connector is added without an existing
-  secret, the toolbox can open a browser window where the user enters the
-  missing credentials (or authorises an OAuth2 flow for BigQuery).  The
-  connector becomes active as soon as the secret is submitted.
+• **MCP user-interaction flow** – if a connector lacks a stored secret SQLKit
+  uses the MCP `CreateUserInteraction` API to instruct the **client** to open a
+  browser window.  The user types the credentials (or completes an OAuth2
+  consent screen) directly in that page – the secret never passes through the
+  MCP client.  Once submitted the connector transitions from PENDING_SECRET to
+  ACTIVE automatically.
 
 
 ## Quick start
@@ -313,7 +315,7 @@ sequenceDiagram
     U->>UI: enter user / pass
     UI->>S: POST secret (TLS)
     S->>SS: encrypt & persist (file:// or mem://)
-    S-->>UI: 204 No&nbsp;Content
+    S-->>UI: 204 No Content
     S-->>C: optional MCP notification
     note over S: connector state ➜ ACTIVE
 ```
@@ -336,7 +338,7 @@ sequenceDiagram
     C-->>U: open browser to URL
     U->>UI: navigate
     UI->>S: GET interaction page (OAuth flow)
-    UI->>OP: redirect (Auth&nbsp;URL)
+    UI->>OP: redirect (Auth URL)
     OP->>UI: login & consent
     OP-->>UI: redirect back with code
     UI->>S: POST code
