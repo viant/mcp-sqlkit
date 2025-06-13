@@ -44,9 +44,12 @@ distributed as a single self-contained executable (`mcp-sqlkit`).
 • **Zero-copy result streaming** – query results are streamed directly from
   `database/sql` into JSON without intermediate allocations.
 
-• **Built-in secret management** – credentials are stored encrypted on the
-  local filesystem (`~/.secret/mcpt` by default) or kept in-memory when a
-  secret location is not configured.
+• **Built-in secret management** – credentials are **encrypted with
+  [scy](https://github.com/viant/scy)** (Blowfish-GCM by default) and written
+  to an abstract secret URL.  Out-of-the-box SQLKit supports `file://` (local
+  disk), `mem://` (in-memory) and any additional schemes implemented by the
+  scy project – for example Cloud Secret Manager, HashiCorp Vault, etc.  The
+  default location is `file://~/.secret/mcpt`.
 
 • **MCP user-interaction flow** – if a connector lacks a stored secret SQLKit
   uses the MCP `CreateUserInteraction` API to instruct the **client** to open a
@@ -239,8 +242,15 @@ Secrets are encrypted with [scy](https://github.com/viant/scy) and stored at:
 <SecretBaseLocation>/<driver>/<database>/<namespace>
 ```
 
-Changing `SecretBaseLocation` to an empty string keeps all secrets purely in
-memory – convenient for demos but **do not use in production**.
+Key points about secret storage:
+
+* Encryption uses Blowfish-GCM with keys managed by scy; SQLKit never stores
+  secrets in plain text.
+* The location scheme is pluggable – any URL that scy recognises works
+  (`file://`, `mem://`, `gsecret://`, `vault://`, …).
+* Changing `SecretBaseLocation` to an empty string switches to `mem://`
+  storage so secrets live only for the lifetime of the process. Great for
+  demos, **not recommended for production**.
 
 
 ## Authentication & authorization
