@@ -360,6 +360,40 @@ Security properties:
   demos but not recommended for production.
 
 
+### Auto-elicitation when connector is missing
+
+If a user invokes a tool that references **an unknown connector** SQLKit will
+activate the MCP **Elicit** protocol method to collect the missing
+definition _on the fly_.  The server sends a JSON-Schema describing the
+`ConnectionInput` structure; the MCP client renders it as a form, collects the
+input and returns it without any secrets.  The subsequent secret flow runs the
+same way as in Branch A/B.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant C as "MCP Client"
+    participant S as "SQLKit Server"
+    participant SS as "Secret Store"
+
+    U->>C: dbQuery (connector=unknown)
+    C->>S: rpc dbQuery
+    S-->>C: Elicit request (ConnectionInput schema)
+    C-->>U: render form
+    U->>C: fill host / port / db …
+    C->>S: Elicit result (accepted)
+    S->>S: create connector (may be PENDING_SECRET)
+    alt secret required
+        S-->>C: state = PENDING_SECRET (+callback URL)
+    else no secret
+        S-->>C: dbQuery result
+    end
+    S->>SS: (optional) persist secret when provided
+```
+
+
+
 ## Installation
 
 Pre-built binaries are provided on the [releases page]
