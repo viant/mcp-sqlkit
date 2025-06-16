@@ -10,11 +10,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/viant/mcp-sqlkit/db/connector"
+	"github.com/viant/mcp-sqlkit/policy"
+	"github.com/viant/scy"
+	"github.com/viant/scy/cred"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
 	"reflect"
 	"syscall"
 	"time"
@@ -23,14 +26,10 @@ import (
 	"github.com/viant/mcp-protocol/authorization"
 	"github.com/viant/mcp-protocol/oauth2/meta"
 	"github.com/viant/mcp-protocol/schema"
-	"github.com/viant/mcp-sqlkit/db/connector"
 	"github.com/viant/mcp-sqlkit/mcp"
-	"github.com/viant/mcp-sqlkit/policy"
 	mcpsrv "github.com/viant/mcp/server"
 	serverauth "github.com/viant/mcp/server/auth"
-	"github.com/viant/scy"
 	"github.com/viant/scy/auth/flow"
-	"github.com/viant/scy/cred"
 )
 
 // run is invoked by main and orchestrates CLI parsing, configuration loading,
@@ -96,6 +95,11 @@ func loadConfig(opts *Options) (*mcp.Config, error) {
 	if opts == nil {
 		return &mcp.Config{}, nil
 	}
+	var cfg = &mcp.Config{
+		Connector: &connector.Config{
+			Policy: &policy.Policy{},
+		},
+	}
 
 	if opts.ConfigPath != "" {
 		data, err := os.ReadFile(opts.ConfigPath)
@@ -106,31 +110,28 @@ func loadConfig(opts *Options) (*mcp.Config, error) {
 		if err := json.Unmarshal(data, &cfg); err != nil {
 			return nil, err
 		}
-    if opts.UseData {
-        cfg.UseData = true // CLI override
+		if opts.UseData {
+			cfg.UseData = true // CLI override
 		}
-		return cfg, nil
 	}
 
-	// Build implicit default config ---------------------------------------
-	sec := scy.New()
-	resPath := path.Join(os.Getenv("HOME"), ".secret/idp_viant.enc")
-	resource := scy.NewResource(reflect.TypeOf(&cred.Oauth2Config{}), resPath, "blowfish://default")
-	secret, err := sec.Load(context.Background(), resource)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load default OAuth2 secret: %w", err)
+	if aPolicy := cfg.Connector.Policy; aPolicy != nil {
+		if aPolicy.Oauth2Config == nil && opts.Oauth2Config != "" {
+			sec := scy.New()
+			resource := scy.NewResource(reflect.TypeOf(&cred.Oauth2Config{}), opts.Oauth2Config, "blowfish://default")
+			secret, err := sec.Load(context.Background(), resource)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load default OAuth2 secret: %w", err)
+			}
+			oauthCfg, ok := secret.Target.(*cred.Oauth2Config)
+			if ok {
+				aPolicy.Oauth2Config = &oauthCfg.Config
+			} else {
+				return nil, fmt.Errorf("unable to load default OAuth2 config")
+			}
+		}
 	}
-	oauthCfg := secret.Target.(*cred.Oauth2Config)
 
-	cfg := &mcp.Config{
-		Connector: &connector.Config{
-			Policy: &policy.Policy{
-				RequireIdentityToken: true,
-				Oauth2Config:         &oauthCfg.Config,
-			},
-		},
-    UseData: opts.UseData,
-	}
 	return cfg, nil
 }
 
