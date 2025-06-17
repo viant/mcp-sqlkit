@@ -73,6 +73,9 @@ func New(connectors *connector.Service) *Service {
 
 // ListTables returns tables available in the specified catalog/schema.
 func (s *Service) ListTables(ctx context.Context, input *ListTablesInput) *TablesOutput {
+	if input == nil {
+		input = &ListTablesInput{}
+	}
 	out := &TablesOutput{Status: "ok"}
 	if err := s.listTables(ctx, input, out); err != nil {
 		out.Status = "error"
@@ -84,7 +87,9 @@ func (s *Service) ListTables(ctx context.Context, input *ListTablesInput) *Table
 // ListColumns returns column metadata for the specified table.
 func (s *Service) ListColumns(ctx context.Context, input *ListColumnsInput) *ColumnsOutput {
 	out := &ColumnsOutput{Status: "ok"}
-
+	if input == nil {
+		input = &ListColumnsInput{}
+	}
 	if err := s.listColumns(ctx, input, out); err != nil {
 		out.Status = "error"
 		out.Error = err.Error()
@@ -94,7 +99,7 @@ func (s *Service) ListColumns(ctx context.Context, input *ListColumnsInput) *Col
 
 // listTables executes the metadata query and fills the output on success.
 func (s *Service) listTables(ctx context.Context, input *ListTablesInput, out *TablesOutput) error {
-	db, err := s.db(ctx, input.Connector)
+	db, err := s.db(ctx, &input.Connector)
 	if err != nil {
 		return err
 	}
@@ -123,7 +128,7 @@ func (s *Service) extractSchema(ctx context.Context, connector string) string {
 
 // listColumns executes the metadata query and fills the output on success.
 func (s *Service) listColumns(ctx context.Context, input *ListColumnsInput, out *ColumnsOutput) error {
-	db, err := s.db(ctx, input.Connector)
+	db, err := s.db(ctx, &input.Connector)
 	if err != nil {
 		return err
 	}
@@ -142,10 +147,11 @@ func (s *Service) listColumns(ctx context.Context, input *ListColumnsInput, out 
 }
 
 // db resolves the *sql.DB instance for a connector.
-func (s *Service) db(ctx context.Context, name string) (*sql.DB, error) {
-	conn, err := s.connectors.Connection(ctx, name)
+func (s *Service) db(ctx context.Context, name *string) (*sql.DB, error) {
+	conn, err := s.connectors.Connection(ctx, *name)
 	if err != nil {
 		return nil, err
 	}
+	*name = conn.Name
 	return conn.Db(ctx)
 }
