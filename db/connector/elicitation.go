@@ -68,7 +68,7 @@ func (i *ConnectionInput) Expand(dsn string) string {
 		dsn = strings.Replace(dsn, "${Project}", i.Project, 1)
 	}
 	if strings.Contains(dsn, "${Db}") {
-		dsn = strings.Replace(dsn, "${Db}", i.Project, 1)
+		dsn = strings.Replace(dsn, "${Db}", i.Db, 1)
 	}
 	return dsn
 }
