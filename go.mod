@@ -18,7 +18,7 @@ require (
 	github.com/viant/mcp-protocol v0.4.4
 	github.com/viant/scy v0.25.1
 	github.com/viant/sqlparser v0.8.1
-	github.com/viant/sqlx v0.17.3
+	github.com/viant/sqlx v0.17.4
 	github.com/viant/structology v0.7.1
 	github.com/viant/tagly v0.2.0
 	github.com/viant/velty v0.2.0

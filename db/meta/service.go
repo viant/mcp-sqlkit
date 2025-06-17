@@ -3,6 +3,8 @@ package meta
 import (
 	"context"
 	"database/sql"
+	"net/url"
+	"strings"
 
 	// Ensure popular drivers & metadata products are registered.
 	_ "github.com/viant/mcp-sqlkit/db/driver"
@@ -17,7 +19,7 @@ import (
 // ListTablesInput defines parameters for retrieving table metadata.
 type ListTablesInput struct {
 	// Connector name registered in the toolbox.
-	Connector string `json:"connector"`
+	Connector string `json:"connector,omitempty"`
 
 	// Catalog/database name (optional).
 	Catalog string `json:"catalog,omitempty"`
@@ -29,7 +31,7 @@ type ListTablesInput struct {
 // ListColumnsInput defines parameters for retrieving column metadata of a table.
 type ListColumnsInput struct {
 	// Connector to use.
-	Connector string `json:"connector"`
+	Connector string `json:"connector,omitempty"`
 
 	// Catalog/database name (optional).
 	Catalog string `json:"catalog,omitempty"`
@@ -82,6 +84,7 @@ func (s *Service) ListTables(ctx context.Context, input *ListTablesInput) *Table
 // ListColumns returns column metadata for the specified table.
 func (s *Service) ListColumns(ctx context.Context, input *ListColumnsInput) *ColumnsOutput {
 	out := &ColumnsOutput{Status: "ok"}
+
 	if err := s.listColumns(ctx, input, out); err != nil {
 		out.Status = "error"
 		out.Error = err.Error()
@@ -96,6 +99,9 @@ func (s *Service) listTables(ctx context.Context, input *ListTablesInput, out *T
 		return err
 	}
 
+	if input.Schema == "" {
+		input.Schema = s.extractSchema(ctx, input.Connector)
+	}
 	m := metadata.New()
 	var tables []sink.Table
 	if err := m.Info(ctx, db, info.KindTables, &tables, option.NewArgs(input.Catalog, input.Schema)); err != nil {
@@ -107,13 +113,23 @@ func (s *Service) listTables(ctx context.Context, input *ListTablesInput, out *T
 	return nil
 }
 
+func (s *Service) extractSchema(ctx context.Context, connector string) string {
+	conn, _ := s.connectors.Connection(ctx, connector)
+	if URL, err := url.Parse(conn.DSN); err == nil {
+		return strings.Trim(URL.Path, "/")
+	}
+	return ""
+}
+
 // listColumns executes the metadata query and fills the output on success.
 func (s *Service) listColumns(ctx context.Context, input *ListColumnsInput, out *ColumnsOutput) error {
 	db, err := s.db(ctx, input.Connector)
 	if err != nil {
 		return err
 	}
-
+	if input.Schema == "" {
+		input.Schema = s.extractSchema(ctx, input.Connector)
+	}
 	m := metadata.New()
 	var columns []sink.Column
 	if err := m.Info(ctx, db, info.KindTable, &columns, option.NewArgs(input.Catalog, input.Schema, input.Table)); err != nil {
