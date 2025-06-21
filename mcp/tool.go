@@ -49,7 +49,7 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	}
 
 	// Register add connection tool (structured input, no DSN allowed)
-	if err := protoserver.RegisterTool[*connector.ConnectionInput, *connector.AddOutput](base.Registry, "dbAddConnection", "Register a new database connector.", func(ctx context.Context, input *connector.ConnectionInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*connector.ConnectionInput, *connector.AddOutput](base.Registry, "dbAddConnection", "Created a new database connector.", func(ctx context.Context, input *connector.ConnectionInput) (*schema.CallToolResult, *jsonrpc.Error) {
 		if err := ret.connectors.UpsertConnection(ctx, input); err != nil {
 			return buildErrorResult(err.Error())
 		}

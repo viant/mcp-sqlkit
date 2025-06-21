@@ -65,7 +65,7 @@ The easiest way to try the toolbox is to run the server with both HTTP and
 STDIO transports enabled:
 
 ```bash
-go run ./cmd/mcp-sqlkit -a :5000 -s
+go run ./cmd/mcp-sqlkit -a :5000 
 ```
 
 * `-a :5000` – HTTP listen address (omit to disable HTTP transport).

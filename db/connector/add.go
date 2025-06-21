@@ -39,7 +39,8 @@ func (s *Service) Add(ctx context.Context, connector *Connector) error {
 					Id:   pend.UUID,
 					Type: "ua",
 					Interaction: schema.CreateUserInteractionRequestParamsInteraction{
-						Url: pend.CallbackURL,
+						Message: &schema.TextContent{Text: "Accept interaction to provide secrets for " + connector.Name + " connector", Type: "text"},
+						Url:     pend.CallbackURL,
 					},
 				}}})
 

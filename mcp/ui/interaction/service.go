@@ -226,7 +226,7 @@ func (s *Service) handleCompletion(w http.ResponseWriter, pend *connector.Pendin
 	// Mark pending completed.
 	_ = s.Connector.CompletePending(pend.UUID)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(`<html><body><h3>Connector ready – you may close this tab.</h3></body></html>`))
+	_, _ = w.Write([]byte(`<html><body><h3>Connector ready – you may close this tab.</h3><script>window.close();</script></body></html>`))
 }
 
 func (s *Service) postData(r *http.Request) (map[string]string, error) {
