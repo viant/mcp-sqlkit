@@ -32,15 +32,21 @@ func (s *Service) Add(ctx context.Context, connector *Connector) error {
 	pend.MCP = s.mcpClient
 	connector.secrets = s.secrets
 	// If client can handle CreateUserInteraction generate it and optionally wait.
-	if impl, ok := s.mcpClient.(client.Operations); ok && impl.Implements(schema.MethodInteractionCreate) {
-		_, _ = impl.CreateUserInteraction(ctx, &jsonrpc.TypedRequest[*schema.CreateUserInteractionRequest]{
-			Request: &schema.CreateUserInteractionRequest{
-				Params: schema.CreateUserInteractionRequestParams{
-					Id:   pend.UUID,
-					Type: "ua",
-					Interaction: schema.CreateUserInteractionRequestParamsInteraction{
-						Message: &schema.TextContent{Text: "Accept interaction to provide secrets for " + connector.Name + " connector", Type: "text"},
-						Url:     pend.CallbackURL,
+	if impl, ok := s.mcpClient.(client.Operations); ok && impl.Implements(schema.MethodElicitationCreate) {
+		_, _ = impl.Elicit(ctx, &jsonrpc.TypedRequest[*schema.ElicitRequest]{
+			Request: &schema.ElicitRequest{
+				Params: schema.ElicitRequestParams{
+					Message: "Initiate secrets flow for " + connector.Name + " connector",
+					RequestedSchema: schema.ElicitRequestParamsRequestedSchema{
+						Properties: map[string]interface{}{
+							"flowURI": map[string]interface{}{
+								"default":     pend.CallbackURL,
+								"type":        "string",
+								"title":       "Flow URI",
+								"description": "URI of the flow to initiate",
+							},
+						},
+						Required: []string{"flowURI"},
 					},
 				}}})
 

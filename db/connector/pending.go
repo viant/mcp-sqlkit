@@ -18,7 +18,7 @@ type PendingSecret struct {
 	ConnectorMeta *meta.Config
 	Connector     *Connector
 	NS            *Namespace
-	uiRequest     *jsonrpc.TypedRequest[*schema.CreateUserInteractionRequest]
+	uiRequest     *jsonrpc.TypedRequest[*schema.ElicitRequest]
 	CallbackURL   string
 	CredType      reflect.Type
 	MCP           client.Operations
