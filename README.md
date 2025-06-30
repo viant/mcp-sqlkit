@@ -51,9 +51,9 @@ distributed as a single self-contained executable (`mcp-sqlkit`).
   scy project – for example Cloud Secret Manager, HashiCorp Vault, etc.  The
   default location is `file://~/.secret/mcpt`.
 
-• **MCP user-interaction flow** – if a connector lacks a stored secret SQLKit
-  uses the MCP `CreateUserInteraction` API to instruct the **client** to open a
-  browser window.  The user types the credentials (or completes an OAuth2
+• **MCP secret-elicitation flow** – if a connector lacks a stored secret SQLKit
+  uses the MCP `Elicit` API to instruct the **client** to kick-off a
+  browser-based flow.  The user types the credentials (or completes an OAuth2
   consent screen) directly in that page – the secret never passes through the
   MCP client.  Once submitted the connector transitions from PENDING_SECRET to
   ACTIVE automatically.
@@ -192,7 +192,7 @@ The toolbox registers the following MCP tools (see `mcp/tool.go`).
 ### Example – query a MySQL database
 
 1. Register a connector (either via `dbAddConnection` or through the browser
-   interaction described later). With `dbAddConnection` you pass only
+   secret-elicitation flow described later). With `dbAddConnection` you pass only
    **non-secret** fields:
 
 ```jsonc
@@ -207,7 +207,7 @@ The toolbox registers the following MCP tools (see `mcp/tool.go`).
 ```
 
    The toolbox expands these into a driver-specific DSN template (e.g.
-   `tcp(127.0.0.1:3306)/test?parseTime=true`) and triggers the user-interaction
+   `tcp(127.0.0.1:3306)/test?parseTime=true`) and triggers the secret-elicitation
    flow if credentials are missing.
 
 2. Call the `dbQuery` tool with the following payload:
@@ -227,8 +227,8 @@ The toolbox registers the following MCP tools (see `mcp/tool.go`).
 
 When you add a connector whose credentials are not yet stored the toolbox
 transitions it into a **PENDING_SECRET** state and – provided the client
-supports `CreateUserInteraction` – opens a browser page where you can supply
-the secret.
+supports the MCP `Elicit` method – initiates a browser-based flow where you can
+enter the secret.
 
 • **Basic auth drivers** (e.g. MySQL, Postgres) prompt for _username_ and
   _password_.
@@ -296,8 +296,8 @@ Adding a connector is a two-step operation:
 1.  Persist the **connection definition** (driver, DSN, etc.).
 2.  Supply the associated **secret** (basic credentials _or_ OAuth token).
 
-Step 2 is performed via a browser-based user-interaction page served by
-SQLKit so that credentials never transit through the MCP client.  The flow is
+Step 2 is performed via a browser-based page started by the Elicit request and
+served by SQLKit so that credentials never transit through the MCP client.  The flow is
 identical for HTTP and stdio transports and differs only in the type of
 credential supplied.
 
@@ -317,11 +317,11 @@ sequenceDiagram
 
     U->>C: dbAddConnection (missing secret)
     C->>S: rpc dbAddConnection
-    S-->>C: state = PENDING_SECRET (+callback URL)
+    S-->>C: Elicit request (flowURI to secret page)
     note over S: entry stored in-memory
-    C-->>U: open browser to URL
+    C-->>U: open browser to flowURI
     U->>UI: navigate
-    UI->>S: GET interaction page
+    UI->>S: GET secret page
     U->>UI: enter user / pass
     UI->>S: POST secret (TLS)
     S->>SS: encrypt & persist (file:// or mem://)
@@ -344,10 +344,10 @@ sequenceDiagram
 
     U->>C: dbAddConnection (BigQuery etc.)
     C->>S: rpc dbAddConnection
-    S-->>C: state = PENDING_SECRET (+callback URL)
-    C-->>U: open browser to URL
+    S-->>C: Elicit request (flowURI)
+    C-->>U: open browser to flowURI
     U->>UI: navigate
-    UI->>S: GET interaction page (OAuth flow)
+    UI->>S: GET secret page (OAuth flow)
     UI->>OP: redirect (Auth URL)
     OP->>UI: login & consent
     OP-->>UI: redirect back with code

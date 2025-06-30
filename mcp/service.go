@@ -24,7 +24,7 @@ type Service struct {
 	useText bool
 }
 
-// RegisterHTTP attaches all MCP auxiliary HTTP handlers (currently user-interaction callbacks).
+// RegisterHTTP attaches all MCP auxiliary HTTP handlers (currently secret-elicitation callbacks).
 func (s *Service) RegisterHTTP(mux *http.ServeMux) {
 	if s.ui != nil {
 		s.ui.Register(mux)
@@ -80,19 +80,19 @@ func NewService(config *Config) *Service {
 	secrets := scy.New()
 	connectors := connector.NewManager(config.Connector, authService, secrets)
 
-    // Determine field preference for tool results.
-    useText := true // default – place JSON in `text`
-    if config.UseData {
-        useText = false
-    } else if config.UseText { // legacy opt-in flag
-        useText = true
-    }
+	// Determine field preference for tool results.
+	useText := true // default – place JSON in `text`
+	if config.UseData {
+		useText = false
+	} else if config.UseText { // legacy opt-in flag
+		useText = true
+	}
 
-    ret := &Service{
-        connectors: connectors,
-        ui:         interaction.New(connectors, secrets),
-        auth:       authService,
-        useText:    useText,
-    }
+	ret := &Service{
+		connectors: connectors,
+		ui:         interaction.New(connectors, secrets),
+		auth:       authService,
+		useText:    useText,
+	}
 	return ret
 }

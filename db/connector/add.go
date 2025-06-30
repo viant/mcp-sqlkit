@@ -20,8 +20,8 @@ import (
 
 // Add registers or updates a connector in the caller's namespace.  If its secret
 // already exists, the connector becomes ACTIVE immediately.  Otherwise it is
-// placed in PENDING_SECRET state and, provided the client supports
-// CreateUserInteraction, a browser flow is initiated to collect the secret
+// placed in PENDING_SECRET state and, provided the client supports the
+// MCP Elicit protocol, a browser flow is initiated to collect the secret
 // value.  The method never returns the secret and therefore is safe over MCP
 // RPC.
 func (s *Service) Add(ctx context.Context, connector *Connector) error {
@@ -31,7 +31,7 @@ func (s *Service) Add(ctx context.Context, connector *Connector) error {
 	}
 	pend.MCP = s.mcpClient
 	connector.secrets = s.secrets
-	// If client can handle CreateUserInteraction generate it and optionally wait.
+	// If client can handle the Elicit protocol generate it and optionally wait.
 	if impl, ok := s.mcpClient.(client.Operations); ok && impl.Implements(schema.MethodElicitationCreate) {
 		_, _ = impl.Elicit(ctx, &jsonrpc.TypedRequest[*schema.ElicitRequest]{
 			Request: &schema.ElicitRequest{

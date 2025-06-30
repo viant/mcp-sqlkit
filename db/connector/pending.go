@@ -11,7 +11,7 @@ import (
 )
 
 // PendingSecret represents a connector awaiting credential submission through
-// the user-interaction flow.
+// the secret-elicitation flow.
 type PendingSecret struct {
 	UUID          string
 	Namespace     string

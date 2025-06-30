@@ -70,7 +70,7 @@ func (c *Manager) initDefaultConnectors() {
 			// Persist secret if provided and pointing to local resource but not yet stored.
 			if conn.Secrets != nil {
 				if _, err := c.secrets.Load(context.Background(), conn.Secrets); err != nil {
-					// ignore missing secret – connector will require user interaction later.
+					// ignore missing secret – connector will require secret elicitation later.
 				}
 			}
 
@@ -81,7 +81,7 @@ func (c *Manager) initDefaultConnectors() {
 
 // Connection retrieves the Connector by name from the caller's namespace. It
 // does not perform any UI-specific logic – the Service wrapper is responsible
-// for deciding whether to initiate user interaction. Typed errors are
+// for deciding whether to initiate secret elicitation. Typed errors are
 // returned so that the caller can differentiate between the failure reasons.
 func (c *Manager) Connection(ctx context.Context, name string) (*Connector, error) {
 	namespace, err := c.auth.Namespace(ctx)
