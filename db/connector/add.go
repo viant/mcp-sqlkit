@@ -42,6 +42,7 @@ func (s *Service) Add(ctx context.Context, connector *Connector) error {
 							"flowURI": map[string]interface{}{
 								"default":     pend.CallbackURL,
 								"type":        "string",
+								"format":      "uri",
 								"title":       "Flow URI",
 								"description": "URI of the flow to initiate",
 							},

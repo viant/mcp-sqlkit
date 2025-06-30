@@ -64,9 +64,11 @@ distributed as a single self-contained executable (`mcp-sqlkit`).
 The easiest way to try the toolbox is to run the server with both HTTP and
 STDIO transports enabled:
 
+
 ```bash
 go run ./cmd/mcp-sqlkit -a :5000 
 ```
+
 
 * `-a :5000` – HTTP listen address (omit to disable HTTP transport).
 * `-s`       – enable STDIO transport (useful when the toolbox is launched
