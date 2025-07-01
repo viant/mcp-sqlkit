@@ -47,6 +47,7 @@ func (s *Service) Add(ctx context.Context, connector *Connector) error {
 								"description": "URI of the flow to initiate",
 							},
 						},
+						Type:     "object",
 						Required: []string{"flowURI"},
 					},
 				}}})
