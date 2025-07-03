@@ -49,7 +49,7 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	}
 
 	// Register add connection tool (structured input, no DSN allowed)
-	if err := protoserver.RegisterTool[*connector.ConnectionInput, *connector.AddOutput](base.Registry, "dbAddConnection", "Created a new database connector.", func(ctx context.Context, input *connector.ConnectionInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*connector.ConnectionInput, *connector.AddOutput](base.Registry, "dbAddConnection", "Creates a new database connector. NEVER MAKE connection detail guesses, ALWAYS ask the user for: driver, dbname, host, port, project (i.e bigquery, pg, mysql, etc ...)", func(ctx context.Context, input *connector.ConnectionInput) (*schema.CallToolResult, *jsonrpc.Error) {
 		if err := ret.connectors.UpsertConnection(ctx, input); err != nil {
 			return buildErrorResult(err.Error())
 		}
@@ -71,7 +71,7 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	}
 
 	// Register list tables tool
-	if err := protoserver.RegisterTool[*meta.ListTablesInput, *meta.TablesOutput](base.Registry, "dbListTables", "List tables for the specified catalog/schema. If you don't know dsn use 'dev' Connector.", func(ctx context.Context, input *meta.ListTablesInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*meta.ListTablesInput, *meta.TablesOutput](base.Registry, "dbListTables", "List tables for the specified catalog/schema. If you don't know dsn use 'dev' Connector to initiate dsn elicitation.", func(ctx context.Context, input *meta.ListTablesInput) (*schema.CallToolResult, *jsonrpc.Error) {
 		out := ret.meta.ListTables(ctx, input)
 		if out.Status == "error" {
 			return buildErrorResult(out.Error)
@@ -82,7 +82,7 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	}
 
 	// Register list columns tool
-	if err := protoserver.RegisterTool[*meta.ListColumnsInput, *meta.ColumnsOutput](base.Registry, "dbListColumns", "List columns for the specified table. If you don't know dsn use 'dev' Connector.", func(ctx context.Context, input *meta.ListColumnsInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*meta.ListColumnsInput, *meta.ColumnsOutput](base.Registry, "dbListColumns", "List columns for the specified table. If you don't know dsn use 'dev' ' Connector to initiate dsn elicitation.", func(ctx context.Context, input *meta.ListColumnsInput) (*schema.CallToolResult, *jsonrpc.Error) {
 		out := ret.meta.ListColumns(ctx, input)
 		if out.Status == "error" {
 			return buildErrorResult(out.Error)

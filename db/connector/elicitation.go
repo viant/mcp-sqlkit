@@ -118,7 +118,7 @@ func (s *Service) requestConnectorElicit(ctx context.Context, impl client.Operat
 		return connectorName, err
 	}
 	if elicitResult.Action != schema.ElicitResultActionAccept {
-		return connectorName, fmt.Errorf("user: %v", elicitResult.Action)
+		return connectorName, fmt.Errorf("user: reject adding connection %v", elicitResult.Action)
 	}
 
 	// Map result content to ConnectionInput struct

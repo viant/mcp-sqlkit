@@ -33,7 +33,7 @@ func (s *Service) Add(ctx context.Context, connector *Connector) error {
 	connector.secrets = s.secrets
 	// If client can handle the Elicit protocol generate it and optionally wait.
 	if impl, ok := s.mcpClient.(client.Operations); ok && impl.Implements(schema.MethodElicitationCreate) {
-		_, _ = impl.Elicit(ctx, &jsonrpc.TypedRequest[*schema.ElicitRequest]{
+		elicitResult, _ := impl.Elicit(ctx, &jsonrpc.TypedRequest[*schema.ElicitRequest]{
 			Request: &schema.ElicitRequest{
 				Params: schema.ElicitRequestParams{
 					Message: "Initiate secrets flow for " + connector.Name + " connector",
@@ -52,6 +52,11 @@ func (s *Service) Add(ctx context.Context, connector *Connector) error {
 					},
 				}}})
 
+		if elicitResult != nil {
+			if elicitResult.Action != schema.ElicitResultActionAccept {
+				return fmt.Errorf("user reject providing credentials %v", err)
+			}
+		}
 		// Wait for secret submission up to 5 min.
 		select {
 		case <-pend.done:

@@ -157,7 +157,7 @@ func (c *Manager) CancelPending(ctx context.Context, uuid string) error {
 	c.pending.Close(uuid)
 	// Remove from map so it cannot be reused.
 	c.pending.Delete(uuid)
-	if pend.MCP != nil {
+	if pend.MCP != nil && pend.uiRequest != nil {
 		reason := "cancelled by user"
 		requestId, _ := jsonrpc.AsRequestIntId(pend.uiRequest.Id)
 		cancelParams := schema.CancelledNotificationParams{

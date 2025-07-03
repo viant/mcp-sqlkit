@@ -194,7 +194,6 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 
 	resource := pend.Connector.Secrets
 	resource.SetTarget(reflect.TypeOf(basicCred))
-
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	secret := scy.NewSecret(basicCred, resource)
