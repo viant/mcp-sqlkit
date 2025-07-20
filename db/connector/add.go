@@ -36,20 +36,10 @@ func (s *Service) Add(ctx context.Context, connector *Connector) error {
 		elicitResult, _ := impl.Elicit(ctx, &jsonrpc.TypedRequest[*schema.ElicitRequest]{
 			Request: &schema.ElicitRequest{
 				Params: schema.ElicitRequestParams{
-					Message: "Initiate secrets flow for " + connector.Name + " connector",
-					RequestedSchema: schema.ElicitRequestParamsRequestedSchema{
-						Properties: map[string]interface{}{
-							"flowURI": map[string]interface{}{
-								"default":     pend.CallbackURL,
-								"type":        "string",
-								"format":      "uri",
-								"title":       "Flow URI",
-								"description": "URI of the flow to initiate",
-							},
-						},
-						Type:     "object",
-						Required: []string{"flowURI"},
-					},
+					ElicitationId: uuid.New().String(),
+					Message:       "Open URL to provide secrets for " + connector.Name + " connector",
+					Mode:          "oob",
+					Url:           pend.CallbackURL,
 				}}})
 
 		if elicitResult != nil {
