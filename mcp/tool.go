@@ -70,8 +70,25 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 		return err
 	}
 
+	dbListTablesDesc := `Lists tables/views from databases for the specified catalog/schema.
+If you don't know the DSN, use the 'dev' Connector to initiate DSN elicitation.
+
+Parameters:
+- connector: string (required)
+- catalog: string (required for BigQuery; forbidden for MySQL/Postgres)
+- schema: string (required for MySQL/Postgres/BigQuery)
+
+NEVER use unknown parameters (e.g., "table").
+
+Returns:
+{
+  "status": "ok"|"error",
+  "data": [{"Catalog":string,"Schema":string,"Name":string,"Type":"TABLE"|"VIEW","CreateTime":string (timestamp RFC3339)}]
+}
+`
+
 	// Register list tables tool
-	if err := protoserver.RegisterTool[*meta.ListTablesInput, *meta.TablesOutput](base.Registry, "dbListTables", "List tables for the specified catalog/schema. If you don't know dsn use 'dev' Connector to initiate dsn elicitation.", func(ctx context.Context, input *meta.ListTablesInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*meta.ListTablesInput, *meta.TablesOutput](base.Registry, "dbListTables", dbListTablesDesc, func(ctx context.Context, input *meta.ListTablesInput) (*schema.CallToolResult, *jsonrpc.Error) {
 		out := ret.meta.ListTables(ctx, input)
 		if out.Status == "error" {
 			return buildErrorResult(out.Error)
