@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/viant/jsonrpc"
 	"github.com/viant/mcp-protocol/client"
 	"github.com/viant/mcp-protocol/schema"
@@ -110,6 +111,7 @@ func (s *Service) requestConnectorElicit(ctx context.Context, impl client.Operat
 	}
 	elicitResult, err := impl.Elicit(ctx, &jsonrpc.TypedRequest[*schema.ElicitRequest]{Request: &schema.ElicitRequest{
 		Params: schema.ElicitRequestParams{
+			ElicitationId:   uuid.New().String(),
 			Message:         fmt.Sprintf("Please provide connection details for %s %s", connectorName, messageSuffix),
 			RequestedSchema: reqSchema,
 		}}})
