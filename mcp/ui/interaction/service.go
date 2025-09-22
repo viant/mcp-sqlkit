@@ -24,6 +24,9 @@ import (
 //go:embed asset/basic_cred.html
 var basicCred []byte
 
+//go:embed asset/notify.js
+var notifyJS []byte
+
 // Service handles /ui/interaction/{uuid} endpoints.
 type Service struct {
 	Connector *connector.Manager
@@ -38,6 +41,7 @@ func New(connectors *connector.Manager, secrets *scy.Service) *Service {
 // Register attaches HTTP handlers to provided mux.
 func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/ui/interaction/", s.Handle)
+	mux.HandleFunc("/ui/asset/", s.serveAsset)
 }
 
 func (s *Service) Handle(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +56,13 @@ func (s *Service) Handle(w http.ResponseWriter, r *http.Request) {
 	pend, ok := s.Connector.Pending(uuid)
 	if !ok {
 		http.NotFound(w, r)
+		return
+	}
+
+	// If this is a status landing (completed/cancelled/error), render minimal page
+	qs := r.URL.Query()
+	if st := qs.Get("status"); st != "" && qs.Get("elicitationId") != "" {
+		s.renderStatusNotify(w, st, qs.Get("elicitationId"))
 		return
 	}
 
@@ -146,7 +157,7 @@ func (s *Service) handleBigQueryConnectionSetup(w http.ResponseWriter, r *http.R
 		return err
 	}
 	pend.Connector.DSN += firstSeparator + "oauth2ClientURL=" + nurl.QueryEscape(configURL) + "&oauth2TokenURL=" + nurl.QueryEscape(tokenURI)
-	s.handleCompletion(w, pend)
+	s.handleCompletion(w, r, pend)
 	return nil
 }
 
@@ -228,8 +239,8 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 
 	if act, ok := data["action"]; ok && act == "cancel" {
 		_ = s.Connector.CancelPending(r.Context(), pend.UUID)
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte("<html><body><h3>Submission cancelled – you may close this tab.</h3>" + s.notifyAndCloseScript(pend.ElicitID, "cancelled") + "</body></html>"))
+		// Redirect to status landing with parameters for external notify script
+		http.Redirect(w, r, "/ui/interaction/"+pend.UUID+"?elicitationId="+nurl.QueryEscape(pend.ElicitID)+"&status=cancelled", http.StatusSeeOther)
 		return
 	}
 
@@ -301,14 +312,14 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 		return
 	}
 
-	s.handleCompletion(w, pend)
+	s.handleCompletion(w, r, pend)
 }
 
-func (s *Service) handleCompletion(w http.ResponseWriter, pend *connector.PendingSecret) {
+func (s *Service) handleCompletion(w http.ResponseWriter, r *http.Request, pend *connector.PendingSecret) {
 	// Mark pending completed.
 	_ = s.Connector.CompletePending(pend.UUID)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte("<html><body><h3>Connector ready – you may close this tab.</h3>" + s.notifyAndCloseScript(pend.ElicitID, "completed") + "</body></html>"))
+	// Redirect to status landing (GET) so the external script can auto-notify+close
+	http.Redirect(w, r, "/ui/interaction/"+pend.UUID+"?elicitationId="+nurl.QueryEscape(pend.ElicitID)+"&status=completed", http.StatusSeeOther)
 }
 
 func (s *Service) postData(r *http.Request) (map[string]string, error) {
@@ -324,11 +335,26 @@ func (s *Service) postData(r *http.Request) (map[string]string, error) {
 	return data, nil
 }
 
-// notifyAndCloseScript builds a small JS snippet that notifies the opener
-// window (if any) about elicitation completion and attempts to close the tab.
-func (s *Service) notifyAndCloseScript(elicitID, status string) string {
-	// Avoid injecting undefined; keep payload minimal and never include secrets.
-	return fmt.Sprintf(`<script>(function(){try{var id=%q,st=%q; if(window.opener && !window.opener.closed){window.opener.postMessage({type:'mcp:elicitation',elicitationId:id,status:st},'*');}}catch(e){} setTimeout(function(){window.close();},100);}())</script>`, elicitID, status)
+// serveAsset serves small static assets like notify.js from embedded data.
+func (s *Service) serveAsset(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/ui/asset/")
+	switch path {
+	case "notify.js":
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		_, _ = w.Write(notifyJS)
+		return
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+// renderStatusNotify renders a minimal landing page that loads notify.js which
+// reads URL query parameters (elicitationId, status) to notify the opener and close.
+func (s *Service) renderStatusNotify(w http.ResponseWriter, status, elicitID string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// We do not inline scripts; notify.js reads query params.
+	msg := "Connector status: " + status + ". This tab will close automatically."
+	_, _ = w.Write([]byte("<html><body><h3>" + msg + "</h3><script src=\"/ui/asset/notify.js\"></script></body></html>"))
 }
 
 // extractBasicFields attempts to parse host, port, database and options from

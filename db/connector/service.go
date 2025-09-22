@@ -100,7 +100,7 @@ func (s *Service) AddConnection(ctx context.Context, input *ConnectionInput) (*A
 	}
 	dsn := input.Expand(metaCfg.DSN)
 	conn := &Connector{Name: input.Name, Driver: input.Driver, DSN: dsn}
-	return s.Add(ctx, conn)
+	return s.Set(ctx, conn)
 }
 
 // needsForm determines if any required non-secret parameters are missing.
@@ -225,7 +225,7 @@ func (s *Service) requestConnectorForm(ctx context.Context, impl client.Operatio
 		return "", err
 	}
 	conn := &Connector{Name: metaInput.Name, Driver: metaInput.Driver, DSN: metaInput.Expand(metaCfg.DSN)}
-	if _, err := s.Add(ctx, conn); err != nil {
+	if _, err := s.Set(ctx, conn); err != nil {
 		return "", err
 	}
 	return conn.Name, nil

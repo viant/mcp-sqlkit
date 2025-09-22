@@ -8,18 +8,18 @@ import (
 )
 
 type Config struct {
-    Connector *connector.Config
+	Connector *connector.Config
 
-    // UseData, when set to true, instructs SQLKit to put tool results in the
-    // `data` field of CallToolResultContentElem.  When false (default) the
-    // result JSON is carried in the `text` field.  This reverses the legacy
-    // behaviour where `data` was the default.
-    UseData bool `json:"useData,omitempty"`
+	// UseData, when set to true, instructs SQLKit to put tool results in the
+	// `data` field of CallToolResultContentElem.  When false (default) the
+	// result JSON is carried in the `text` field.  This reverses the legacy
+	// behaviour where `data` was the default.
+	UseData bool `json:"useData,omitempty"`
 
-    // Deprecated: kept for backwards-compatibility with earlier versions that
-    // used `useText` (default false).  When both UseText and UseData are set
-    // the latter wins.
-    UseText bool `json:"useText,omitempty"`
+	// Deprecated: kept for backwards-compatibility with earlier versions that
+	// used `useText` (default false).  When both UseText and UseData are set
+	// the latter wins.
+	UseText bool `json:"useText,omitempty"`
 }
 
 func (c *Config) Init(httpAddr string) {
