@@ -23,6 +23,7 @@ type PendingSecret struct {
 	CredType      reflect.Type
 	MCP           client.Operations
 	OAuth2Config  *oauth2.Config
+	ElicitID      string
 	done          chan struct{}
 }
 

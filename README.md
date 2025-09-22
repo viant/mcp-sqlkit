@@ -65,7 +65,7 @@ The easiest way to try the toolbox is to run the server with both HTTP and
 STDIO transports enabled:
 
 
-```bash
+```bash cd
 go run ./cmd/mcp-sqlkit -a :5000 
 ```
 
@@ -185,16 +185,15 @@ The toolbox registers the following MCP tools (see `mcp/tool.go`).
 | `dbQuery`              | Execute a SQL query and return the result set | `db/query.Input`            |
 | `dbExec`               | Execute DML/DDL and return rows affected      | `db/exec.Input`             |
 | `dbListConnections`    | List connectors visible to the caller         | `db/connector.ListInput`    |
-| `dbAddConnection`      | Register a new connector                      | `db/connector.ConnectionInput` |
-| `dbUpdateConnection`   | Update an existing connector (upsert)         | `db/connector.ConnectionInput` |
+| `dbSetConnection`      | Create or update a connector (upsert)         | `db/connector.ConnectionInput` |
 | `dbListTables`         | List tables for a given catalog/schema        | `db/meta.ListTablesInput`   |
 | `dbListColumns`        | List columns for a given table                | `db/meta.ListColumnsInput`  |
 
 
 ### Example – query a MySQL database
 
-1. Register a connector (either via `dbAddConnection` or through the browser
-   secret-elicitation flow described later). With `dbAddConnection` you pass only
+1. Register a connector (either via `dbSetConnection` or through the browser
+   secret-elicitation flow described later). With `dbSetConnection` you pass only
    **non-secret** fields:
 
 ```jsonc
@@ -317,8 +316,8 @@ sequenceDiagram
     participant UI as "Browser (UI)"
     participant SS as "Secret Store"
 
-    U->>C: dbAddConnection (missing secret)
-    C->>S: rpc dbAddConnection
+    U->>C: dbSetConnection (missing secret)
+    C->>S: rpc dbSetConnection
     S-->>C: Elicit request (flowURI to secret page)
     note over S: entry stored in-memory
     C-->>U: open browser to flowURI
@@ -344,8 +343,8 @@ sequenceDiagram
     participant OP as "OAuth Provider"
     participant SS as "Secret Store"
 
-    U->>C: dbAddConnection (BigQuery etc.)
-    C->>S: rpc dbAddConnection
+    U->>C: dbSetConnection (BigQuery etc.)
+    C->>S: rpc dbSetConnection
     S-->>C: Elicit request (flowURI)
     C-->>U: open browser to flowURI
     U->>UI: navigate

@@ -3,19 +3,21 @@ package connector
 import (
 	"context"
 	"fmt"
-	"github.com/viant/jsonrpc"
 	"net/url"
 	"reflect"
 	"time"
+
+	"github.com/viant/jsonrpc"
+
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/viant/mcp-protocol/client"
 	"github.com/viant/mcp-protocol/schema"
 	"github.com/viant/scy"
 	"github.com/viant/scy/cred"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 // Add registers or updates a connector in the caller's namespace.  If its secret
@@ -24,27 +26,36 @@ import (
 // MCP Elicit protocol, a browser flow is initiated to collect the secret
 // value.  The method never returns the secret and therefore is safe over MCP
 // RPC.
-func (s *Service) Add(ctx context.Context, connector *Connector) error {
+func (s *Service) Add(ctx context.Context, connector *Connector) (*AddOutput, error) {
 	pend, err := s.GeneratePendingSecret(ctx, connector)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	pend.MCP = s.mcpClient
 	connector.secrets = s.secrets
+
 	// If client can handle the Elicit protocol generate it and optionally wait.
 	if impl, ok := s.mcpClient.(client.Operations); ok && impl.Implements(schema.MethodElicitationCreate) {
+		elicitID := uuid.New().String()
+		pend.ElicitID = elicitID
+		oobURL := pend.CallbackURL
+		if strings.Contains(oobURL, "?") {
+			oobURL += "&elicitationId=" + url.QueryEscape(elicitID)
+		} else {
+			oobURL += "?elicitationId=" + url.QueryEscape(elicitID)
+		}
 		elicitResult, _ := impl.Elicit(ctx, &jsonrpc.TypedRequest[*schema.ElicitRequest]{
 			Request: &schema.ElicitRequest{
 				Params: schema.ElicitRequestParams{
-					ElicitationId: uuid.New().String(),
+					ElicitationId: elicitID,
 					Message:       "Open URL to provide secrets for " + connector.Name + " connector",
 					Mode:          "oob",
-					Url:           pend.CallbackURL,
+					Url:           oobURL,
 				}}})
 
 		if elicitResult != nil {
 			if elicitResult.Action != schema.ElicitResultActionAccept {
-				return fmt.Errorf("user reject providing credentials %v", err)
+				return nil, fmt.Errorf("user reject providing credentials %v", err)
 			}
 		}
 		// Wait for secret submission up to 5 min.
@@ -60,10 +71,17 @@ func (s *Service) Add(ctx context.Context, connector *Connector) error {
 				pend.NS.Connectors.Put(connector.Name, connector)
 			}
 		case <-time.After(5 * time.Minute):
+			// Timed out – return pending state with callback URL
+			return &AddOutput{Status: "ok", State: "PENDING_SECRET", CallbackURL: pend.CallbackURL, Connector: connector.Name}, nil
 		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
+		// Secret submitted within wait window – connector activated
+		return &AddOutput{Status: "ok", Connector: connector.Name}, nil
 	}
-	return nil
+	// Client cannot handle Elicit – the connector remains pending waiting for
+	// secret to be supplied out-of-band; return pending state with callback URL.
+	return &AddOutput{Status: "ok", State: "PENDING_SECRET", CallbackURL: pend.CallbackURL, Connector: connector.Name}, nil
 }
 
 func (s *Service) GeneratePendingSecret(ctx context.Context, connector *Connector) (*PendingSecret, error) {

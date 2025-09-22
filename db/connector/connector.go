@@ -3,14 +3,15 @@ package connector
 import (
 	"context"
 	"database/sql"
-	"github.com/viant/mcp-protocol/syncmap"
-	"github.com/viant/scy"
-	"github.com/viant/scy/cred"
 	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/viant/mcp-protocol/syncmap"
+	"github.com/viant/scy"
+	"github.com/viant/scy/cred"
 )
 
 type Connectors struct {
@@ -25,7 +26,7 @@ type Connector struct {
 	Name        string        `json:"name" yaml:"name"`
 	DSN         string        `json:"dsn" yaml:"dsn"`
 	Driver      string        `json:"driver" yaml:"driver"`
-	Secrets     *scy.Resource `json:"secrets,omitempty" yaml:"secrets,omitempty"`
+	Secrets     *scy.Resource `json:"secrets,omitempty" yaml:"secrets,omitempty" internal:"true"`
 	db          *sql.DB       `internal:"true"`
 	mux         sync.RWMutex  `internal:"true"`
 	initialized uint32        `internal:"true"`
@@ -55,6 +56,12 @@ func (c *Connector) ExpandDSN(ctx context.Context) (string, error) {
 }
 
 func (c *Connector) Close() error {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	if c.db != nil {
+		_ = c.db.Close()
+		c.db = nil
+	}
 	atomic.StoreUint32(&c.initialized, 0)
 	return nil
 }

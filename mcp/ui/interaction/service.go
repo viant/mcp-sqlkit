@@ -16,6 +16,7 @@ import (
 	"net/http"
 	nurl "net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -91,11 +92,18 @@ func (s *Service) handleGet(w http.ResponseWriter, r *http.Request, pend *connec
 		return s.handleBigQueryConnectionSetup(w, r, pend)
 	}
 
+	host, port, db, options := s.extractBasicFields(pend.Connector.Driver, pend.Connector.DSN)
 	s.renderBasicCred(w, map[string]string{
 		"Dsn":          pend.Connector.DSN,
 		"Connector":    pend.Connector.Name,
 		"UUID":         pend.UUID,
 		"ErrorMessage": "",
+		"Name":         pend.Connector.Name,
+		"Host":         host,
+		"Port":         port,
+		"Db":           db,
+		"Project":      "",
+		"Options":      options,
 	})
 	return nil
 }
@@ -158,13 +166,70 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 	if err != nil {
 		http.Error(w, "invalid form", http.StatusBadRequest)
 	}
+	// Allow editing non-secret connection params and rebuild DSN prior to saving secret.
+	postedName := data["name"]
+	postedHost := data["host"]
+	postedPort := data["port"]
+	postedDb := data["db"]
+	postedProject := data["project"]
+	postedOptions := data["options"]
+
+	// Derive current values from the DSN as fallback.
+	curHost, curPort, curDb, curOptions := s.extractBasicFields(pend.Connector.Driver, pend.Connector.DSN)
+	effName := pend.Connector.Name
+	if postedName != "" {
+		effName = postedName
+	}
+	effHost := curHost
+	if postedHost != "" {
+		effHost = postedHost
+	}
+	effPort := curPort
+	if postedPort != "" {
+		effPort = postedPort
+	}
+	effDb := curDb
+	if postedDb != "" {
+		effDb = postedDb
+	}
+	effProject := ""
+	if postedProject != "" {
+		effProject = postedProject
+	}
+	effOptions := curOptions
+	if postedOptions != "" {
+		effOptions = postedOptions
+	}
+
+	// Rebuild DSN using the connector metadata template.
+	var portVal int
+	if effPort != "" {
+		if p, err := strconv.Atoi(effPort); err == nil {
+			portVal = p
+		}
+	}
+	metaCfg := pend.ConnectorMeta
+	metaIn := &connector.ConnectionInput{Name: effName, Driver: pend.Connector.Driver, Host: effHost, Port: portVal, Project: effProject, Db: effDb, Options: effOptions}
+	metaIn.Init(metaCfg)
+	// Rebuild DSN and apply unconditionally so edited values take effect for
+	// the connectivity check. Validation errors (if any) will surface via
+	// the connection error path below. Ensure any existing DB handle is
+	// reset so changes (like port) are used for the ping.
+	newDSN := metaIn.Expand(metaCfg.DSN)
+	dsnChanged := (pend.Connector.DSN != newDSN) || (pend.Connector.Name != metaIn.Name)
+	pend.Connector.Name = metaIn.Name
+	pend.Connector.DSN = newDSN
+	if dsnChanged {
+		_ = pend.Connector.Close()
+	}
+
 	username := data["username"]
 	password := data["password"]
 
 	if act, ok := data["action"]; ok && act == "cancel" {
 		_ = s.Connector.CancelPending(r.Context(), pend.UUID)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(`<html><body><h3>Submission cancelled – you may close this tab.</h3></body></html>`))
+		_, _ = w.Write([]byte("<html><body><h3>Submission cancelled – you may close this tab.</h3>" + s.notifyAndCloseScript(pend.ElicitID, "cancelled") + "</body></html>"))
 		return
 	}
 
@@ -174,6 +239,12 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 			"Connector":    pend.Connector.Name,
 			"UUID":         pend.UUID,
 			"ErrorMessage": "Username is required",
+			"Name":         effName,
+			"Host":         effHost,
+			"Port":         effPort,
+			"Db":           effDb,
+			"Project":      effProject,
+			"Options":      effOptions,
 		})
 		return
 	}
@@ -183,6 +254,12 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 			"Connector":    pend.Connector.Name,
 			"UUID":         pend.UUID,
 			"ErrorMessage": "Password is required",
+			"Name":         effName,
+			"Host":         effHost,
+			"Port":         effPort,
+			"Db":           effDb,
+			"Project":      effProject,
+			"Options":      effOptions,
 		})
 		return
 	}
@@ -214,6 +291,12 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 			"Connector":    pend.Connector.Name,
 			"UUID":         pend.UUID,
 			"ErrorMessage": fmt.Sprintf("failed to connect to database: %v", err),
+			"Name":         effName,
+			"Host":         effHost,
+			"Port":         effPort,
+			"Db":           effDb,
+			"Project":      effProject,
+			"Options":      effOptions,
 		})
 		return
 	}
@@ -225,7 +308,7 @@ func (s *Service) handleCompletion(w http.ResponseWriter, pend *connector.Pendin
 	// Mark pending completed.
 	_ = s.Connector.CompletePending(pend.UUID)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(`<html><body><h3>Connector ready – you may close this tab.</h3><script>window.close();</script></body></html>`))
+	_, _ = w.Write([]byte("<html><body><h3>Connector ready – you may close this tab.</h3>" + s.notifyAndCloseScript(pend.ElicitID, "completed") + "</body></html>"))
 }
 
 func (s *Service) postData(r *http.Request) (map[string]string, error) {
@@ -239,6 +322,51 @@ func (s *Service) postData(r *http.Request) (map[string]string, error) {
 		}
 	}
 	return data, nil
+}
+
+// notifyAndCloseScript builds a small JS snippet that notifies the opener
+// window (if any) about elicitation completion and attempts to close the tab.
+func (s *Service) notifyAndCloseScript(elicitID, status string) string {
+	// Avoid injecting undefined; keep payload minimal and never include secrets.
+	return fmt.Sprintf(`<script>(function(){try{var id=%q,st=%q; if(window.opener && !window.opener.closed){window.opener.postMessage({type:'mcp:elicitation',elicitationId:id,status:st},'*');}}catch(e){} setTimeout(function(){window.close();},100);}())</script>`, elicitID, status)
+}
+
+// extractBasicFields attempts to parse host, port, database and options from
+// DSN strings produced by built-in templates for mysql and postgres drivers.
+func (s *Service) extractBasicFields(driver, dsn string) (host, port, db, options string) {
+	switch driver {
+	case "postgres":
+		if u, err := nurl.Parse(dsn); err == nil {
+			host = u.Hostname()
+			port = u.Port()
+			db = strings.TrimPrefix(u.Path, "/")
+			options = u.RawQuery
+		}
+	case "mysql":
+		// format: $Username:$Password@tcp(host:port)/db?options
+		if i := strings.Index(dsn, "tcp("); i != -1 {
+			start := i + len("tcp(")
+			if j := strings.Index(dsn[start:], ")"); j != -1 {
+				hp := dsn[start : start+j]
+				if c := strings.LastIndex(hp, ":"); c != -1 {
+					host = hp[:c]
+					port = hp[c+1:]
+				} else {
+					host = hp
+				}
+			}
+		}
+		if parts := strings.SplitN(dsn, ")/", 2); len(parts) == 2 {
+			rest := parts[1]
+			if q := strings.Index(rest, "?"); q != -1 {
+				db = rest[:q]
+				options = rest[q+1:]
+			} else {
+				db = rest
+			}
+		}
+	}
+	return
 }
 
 func (s *Service) ensureGCPOauth2Client(pend *connector.PendingSecret, r *http.Request) error {

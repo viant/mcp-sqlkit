@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+
 	"github.com/viant/jsonrpc"
 	"github.com/viant/mcp-protocol/schema"
 	protoserver "github.com/viant/mcp-protocol/server"
@@ -48,23 +49,12 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 		return err
 	}
 
-	// Register add connection tool (structured input, no DSN allowed)
-	if err := protoserver.RegisterTool[*connector.ConnectionInput, *connector.AddOutput](base.Registry, "dbAddConnection", "Creates a new database connector. NEVER MAKE connection detail guesses, ALWAYS ask the user for: driver, dbname, host, port, project (i.e bigquery, pg, mysql, etc ...)", func(ctx context.Context, input *connector.ConnectionInput) (*schema.CallToolResult, *jsonrpc.Error) {
-		if err := ret.connectors.UpsertConnection(ctx, input); err != nil {
+	// Register set connection tool (upsert + form + OOB secret elicitation)
+	if err := protoserver.RegisterTool[*connector.ConnectionInput, *connector.AddOutput](base.Registry, "dbSetConnection", "Creates or updates a connector. If any connection detail is missing, a form is shown to collect it. Secrets are collected via a secure browser flow and never provided in-band. Partial inputs prefill the form.", func(ctx context.Context, input *connector.ConnectionInput) (*schema.CallToolResult, *jsonrpc.Error) {
+		out, err := ret.connectors.AddConnection(ctx, input)
+		if err != nil {
 			return buildErrorResult(err.Error())
 		}
-		out := &connector.AddOutput{Status: "ok", Connector: input.Name}
-		return buildSuccessResult(ret.service, out)
-	}); err != nil {
-		return err
-	}
-
-	// Register update connection tool (upsert)
-	if err := protoserver.RegisterTool[*connector.ConnectionInput, *connector.UpdateOutput](base.Registry, "dbUpdateConnection", "Update an existing connector (or create if absent).", func(ctx context.Context, input *connector.ConnectionInput) (*schema.CallToolResult, *jsonrpc.Error) {
-		if err := ret.connectors.UpsertConnection(ctx, input); err != nil {
-			return buildErrorResult(err.Error())
-		}
-		out := &connector.UpdateOutput{Status: "ok", Connector: input.Name}
 		return buildSuccessResult(ret.service, out)
 	}); err != nil {
 		return err
@@ -99,7 +89,7 @@ Returns:
 	}
 
 	// Register list columns tool
-	if err := protoserver.RegisterTool[*meta.ListColumnsInput, *meta.ColumnsOutput](base.Registry, "dbListColumns", "List columns for the specified table. If you don't know dsn use 'dev' ' Connector to initiate dsn elicitation.", func(ctx context.Context, input *meta.ListColumnsInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*meta.ListColumnsInput, *meta.ColumnsOutput](base.Registry, "dbListColumns", "List columns for the specified table. If you don't know dsn use 'dev' Connector to initiate dsn elicitation.", func(ctx context.Context, input *meta.ListColumnsInput) (*schema.CallToolResult, *jsonrpc.Error) {
 		out := ret.meta.ListColumns(ctx, input)
 		if out.Status == "error" {
 			return buildErrorResult(out.Error)

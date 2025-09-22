@@ -138,5 +138,8 @@ func (s *Service) requestConnectorElicit(ctx context.Context, impl client.Operat
 		Driver: metaInput.Driver,
 		DSN:    metaInput.Expand(metaConfig.DSN),
 	}
-	return conn.Name, s.Add(ctx, conn)
+	if _, err := s.Add(ctx, conn); err != nil {
+		return "", err
+	}
+	return conn.Name, nil
 }
