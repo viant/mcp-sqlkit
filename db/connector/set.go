@@ -20,13 +20,13 @@ import (
 	"github.com/viant/scy/cred"
 )
 
-// Add registers or updates a connector in the caller's namespace.  If its secret
+// Set registers or updates a connector in the caller's namespace.  If its secret
 // already exists, the connector becomes ACTIVE immediately.  Otherwise it is
 // placed in PENDING_SECRET state and, provided the client supports the
 // MCP Elicit protocol, a browser flow is initiated to collect the secret
 // value.  The method never returns the secret and therefore is safe over MCP
 // RPC.
-func (s *Service) Add(ctx context.Context, connector *Connector) (*AddOutput, error) {
+func (s *Service) Set(ctx context.Context, connector *Connector) (*AddOutput, error) {
 	pend, err := s.GeneratePendingSecret(ctx, connector)
 	if err != nil {
 		return nil, err
