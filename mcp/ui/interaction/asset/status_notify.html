@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Connector Status</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #fafafa; display:flex; align-items:center; justify-content:center; height:100vh; }
+    .box { background:#fff; border:1px solid #eee; border-radius:8px; padding:1.25em 1.5em; box-shadow:0 0 8px rgba(0,0,0,0.08); }
+  </style>
+  <script>
+    (function(){
+      try {
+        var id = "${ElicitationId}";
+        var st = "${Status}";
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'mcp:elicitation', elicitationId: id, status: st }, '*');
+        }
+      } catch (e) {}
+      setTimeout(function(){ try { window.close(); } catch(e){} }, 1000);
+    })();
+  </script>
+</head>
+<body>
+  <div class="box">
+    <h3>${Message}</h3>
+  </div>
+</body>
+</html>
+

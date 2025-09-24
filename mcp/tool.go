@@ -50,7 +50,7 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	}
 
 	// Register set connection tool (upsert + form + OOB secret elicitation)
-	if err := protoserver.RegisterTool[*connector.ConnectionInput, *connector.AddOutput](base.Registry, "dbSetConnection", "Creates or updates a connector. If any connection detail is missing, a form is shown to collect it. Secrets are collected via a secure browser flow and never provided in-band. Partial inputs prefill the form.", func(ctx context.Context, input *connector.ConnectionInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*connector.ConnectionInput, *connector.AddOutput](base.Registry, "dbSetConnection", "Creates or updates a connector. NEVER ask user for connection details, this tool initiated oob flow to collect all necessary details", func(ctx context.Context, input *connector.ConnectionInput) (*schema.CallToolResult, *jsonrpc.Error) {
 		out, err := ret.connectors.AddConnection(ctx, input)
 		if err != nil {
 			return buildErrorResult(err.Error())
@@ -61,11 +61,11 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	}
 
 	dbListTablesDesc := `Lists tables/views from databases for the specified catalog/schema.
-If you don't know the DSN, use the 'dev' Connector to initiate DSN elicitation.
+If you don't know the DSN, use the 'dev' Connector to initiate DSN elicitation. Collect required information from listing database connectors
 
 Parameters:
 - connector: string (required)
-- catalog: string (required for BigQuery; forbidden for MySQL/Postgres)
+- catalog: string (MUST populate  for BigQuery; CAN NOT use for MySQL/Postgres)
 - schema: string (required for MySQL/Postgres/BigQuery)
 
 NEVER use unknown parameters (e.g., "table").

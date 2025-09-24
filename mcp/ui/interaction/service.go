@@ -27,6 +27,9 @@ var basicCred []byte
 //go:embed asset/notify.js
 var notifyJS []byte
 
+//go:embed asset/status_notify.html
+var statusNotify []byte
+
 // Service handles /ui/interaction/{uuid} endpoints.
 type Service struct {
 	Connector *connector.Manager
@@ -170,6 +173,28 @@ func (s *Service) renderBasicCred(w http.ResponseWriter, data map[string]string)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(content)
+}
+
+func (s *Service) renderStatusHTML(w http.ResponseWriter, data map[string]string) {
+	planner := velty.New()
+	for k, v := range data {
+		planner.DefineVariable(k, v)
+	}
+	execution, newState, err := planner.Compile(statusNotify)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	state := newState()
+	for k, v := range data {
+		state.SetValue(k, v)
+	}
+	if err = execution.Exec(state); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(state.Buffer.Bytes())
 }
 
 func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *connector.PendingSecret) {
@@ -351,10 +376,12 @@ func (s *Service) serveAsset(w http.ResponseWriter, r *http.Request) {
 // renderStatusNotify renders a minimal landing page that loads notify.js which
 // reads URL query parameters (elicitationId, status) to notify the opener and close.
 func (s *Service) renderStatusNotify(w http.ResponseWriter, status, elicitID string) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// We do not inline scripts; notify.js reads query params.
-	msg := "Connector status: " + status + ". This tab will close automatically."
-	_, _ = w.Write([]byte("<html><body><h3>" + msg + "</h3><script src=\"/ui/asset/notify.js\"></script></body></html>"))
+	data := map[string]string{
+		"Message":       "Connector status: " + status + ". This tab will close automatically.",
+		"ElicitationId": elicitID,
+		"Status":        status,
+	}
+	s.renderStatusHTML(w, data)
 }
 
 // extractBasicFields attempts to parse host, port, database and options from
