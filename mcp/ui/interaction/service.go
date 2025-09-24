@@ -4,6 +4,13 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"net/http"
+	nurl "net/url"
+	"reflect"
+	"strconv"
+	"strings"
+	"time"
+
 	_ "github.com/viant/afs/mem"
 	"github.com/viant/afs/url"
 	"github.com/viant/bigquery"
@@ -13,19 +20,10 @@ import (
 	"github.com/viant/scy/auth/gcp/client"
 	"github.com/viant/scy/cred"
 	"github.com/viant/velty"
-	"net/http"
-	nurl "net/url"
-	"reflect"
-	"strconv"
-	"strings"
-	"time"
 )
 
 //go:embed asset/basic_cred.html
 var basicCred []byte
-
-//go:embed asset/notify.js
-var notifyJS []byte
 
 //go:embed asset/status_notify.html
 var statusNotify []byte
@@ -44,7 +42,6 @@ func New(connectors *connector.Manager, secrets *scy.Service) *Service {
 // Register attaches HTTP handlers to provided mux.
 func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/ui/interaction/", s.Handle)
-	mux.HandleFunc("/ui/asset/", s.serveAsset)
 }
 
 func (s *Service) Handle(w http.ResponseWriter, r *http.Request) {
@@ -358,19 +355,6 @@ func (s *Service) postData(r *http.Request) (map[string]string, error) {
 		}
 	}
 	return data, nil
-}
-
-// serveAsset serves small static assets like notify.js from embedded data.
-func (s *Service) serveAsset(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/ui/asset/")
-	switch path {
-	case "notify.js":
-		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-		_, _ = w.Write(notifyJS)
-		return
-	default:
-		http.NotFound(w, r)
-	}
 }
 
 // renderStatusNotify renders a minimal landing page that loads notify.js which
