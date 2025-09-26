@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	_ "embed"
 
 	"github.com/viant/jsonrpc"
 	"github.com/viant/mcp-protocol/schema"
@@ -13,9 +14,29 @@ import (
 	"github.com/viant/mcp-sqlkit/db/query"
 )
 
+// Embedded markdown descriptions for tools
+//
+//go:embed descriptions/dbQuery.md
+var dbQueryDesc string
+
+//go:embed descriptions/dbExec.md
+var dbExecDesc string
+
+//go:embed descriptions/dbListConnections.md
+var dbListConnectionsDesc string
+
+//go:embed descriptions/dbSetConnection.md
+var dbSetConnectionDesc string
+
+//go:embed descriptions/dbListTables.md
+var dbListTablesDesc string
+
+//go:embed descriptions/dbListColumns.md
+var dbListColumnsDesc string
+
 func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	// Register query tool
-	if err := protoserver.RegisterTool[*query.Input, *query.Output](base.Registry, "dbQuery", "Execute SQL query and return result set as JSON array. If you don't know dsn use 'dev' Connector.", func(ctx context.Context, input *query.Input) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*query.Input, *query.Output](base.Registry, "dbQuery", dbQueryDesc, func(ctx context.Context, input *query.Input) (*schema.CallToolResult, *jsonrpc.Error) {
 		out := ret.query.Query(ctx, input)
 		if out.Status == "error" {
 			return buildErrorResult(out.Error)
@@ -26,7 +47,7 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	}
 
 	// Register exec tool
-	if err := protoserver.RegisterTool[*exec.Input, *exec.Output](base.Registry, "dbExec", "Execute SQL DML/DDL statement and return rows affected and last insert id. If you don't know dsn use 'dev' Connector", func(ctx context.Context, input *exec.Input) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*exec.Input, *exec.Output](base.Registry, "dbExec", dbExecDesc, func(ctx context.Context, input *exec.Input) (*schema.CallToolResult, *jsonrpc.Error) {
 		out := ret.exec.Execute(ctx, input)
 		if out.Status == "error" {
 			return buildErrorResult(out.Error)
@@ -39,7 +60,7 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	}
 
 	// Register list connections tool
-	if err := protoserver.RegisterTool[*connector.ListInput, *connector.ListOutput](base.Registry, "dbListConnections", "List database connectors.", func(ctx context.Context, input *connector.ListInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*connector.ListInput, *connector.ListOutput](base.Registry, "dbListConnections", dbListConnectionsDesc, func(ctx context.Context, input *connector.ListInput) (*schema.CallToolResult, *jsonrpc.Error) {
 		out := ret.connectors.ListConnectors(ctx, input)
 		if out.Status == "error" {
 			return buildErrorResult(out.Error)
@@ -50,7 +71,7 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	}
 
 	// Register set connection tool (upsert + form + OOB secret elicitation)
-	if err := protoserver.RegisterTool[*connector.ConnectionInput, *connector.AddOutput](base.Registry, "dbSetConnection", "Creates or updates a connector. NEVER ask user for connection details, this tool initiated oob flow to collect all necessary details", func(ctx context.Context, input *connector.ConnectionInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*connector.ConnectionInput, *connector.AddOutput](base.Registry, "dbSetConnection", dbSetConnectionDesc, func(ctx context.Context, input *connector.ConnectionInput) (*schema.CallToolResult, *jsonrpc.Error) {
 		out, err := ret.connectors.AddConnection(ctx, input)
 		if err != nil {
 			return buildErrorResult(err.Error())
@@ -59,23 +80,6 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	}); err != nil {
 		return err
 	}
-
-	dbListTablesDesc := `Lists tables/views from databases for the specified catalog/schema.
-If you don't know the DSN, use the 'dev' Connector to initiate DSN elicitation. Collect required information from listing database connectors
-
-Parameters:
-- connector: string (required)
-- catalog: string (MUST populate  for BigQuery; CAN NOT use for MySQL/Postgres)
-- schema: string (required for MySQL/Postgres/BigQuery)
-
-NEVER use unknown parameters (e.g., "table").
-
-Returns:
-{
-  "status": "ok"|"error",
-  "data": [{"Catalog":string,"Schema":string,"Name":string,"Type":"TABLE"|"VIEW","CreateTime":string (timestamp RFC3339)}]
-}
-`
 
 	// Register list tables tool
 	if err := protoserver.RegisterTool[*meta.ListTablesInput, *meta.TablesOutput](base.Registry, "dbListTables", dbListTablesDesc, func(ctx context.Context, input *meta.ListTablesInput) (*schema.CallToolResult, *jsonrpc.Error) {
@@ -89,7 +93,7 @@ Returns:
 	}
 
 	// Register list columns tool
-	if err := protoserver.RegisterTool[*meta.ListColumnsInput, *meta.ColumnsOutput](base.Registry, "dbListColumns", "List columns for the specified table. If you don't know dsn use 'dev' Connector to initiate dsn elicitation.", func(ctx context.Context, input *meta.ListColumnsInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	if err := protoserver.RegisterTool[*meta.ListColumnsInput, *meta.ColumnsOutput](base.Registry, "dbListColumns", dbListColumnsDesc, func(ctx context.Context, input *meta.ListColumnsInput) (*schema.CallToolResult, *jsonrpc.Error) {
 		out := ret.meta.ListColumns(ctx, input)
 		if out.Status == "error" {
 			return buildErrorResult(out.Error)
