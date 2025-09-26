@@ -1,15 +1,15 @@
-List tables/views for a specific database/schema.
+Lists tables/views from databases for the specified catalog/schema.
+If you don't know the DSN, use the 'dev' Connector to initiate DSN elicitation. Collect required information from listing database connectors
 
-Pre-Flight
-- Identify the target database and schema.
-- Confirm a connector that serves it via `dbListConnections`.
-- Do not call with a connector tied to a different database.
+Parameters:
+- connector: string (required)
+- catalog: string (MUST populate  for BigQuery; CAN NOT use for MySQL/Postgres)
+- schema: string (required for MySQL/Postgres/BigQuery)
 
-If Missing Connector
-- Ask whether to add one via `dbSetConnection`.
-- Collect all required fields at once (one-shot form), never a single field.
+NEVER use unknown parameters (e.g., "table").
 
-Shared Rules
-- Never guess or reuse a connector for the wrong DB.
-- Always validate against `dbListConnections` before calling.
-
+Returns:
+{
+  "status": "ok"|"error",
+  "data": [{"Catalog":string,"Schema":string,"Name":string,"Type":"TABLE"|"VIEW","CreateTime":string (timestamp RFC3339)}]
+}
