@@ -16,12 +16,14 @@ import (
 	_ "modernc.org/sqlite"
 
 	// Viant drivers
+	_ "github.com/sijms/go-ora/v2"
 	_ "github.com/viant/bigquery"
 
 	// sqlx metadata product registrations (ensure dialect specific queries are available)
 	_ "github.com/viant/sqlx/metadata/product/ansi"
 	_ "github.com/viant/sqlx/metadata/product/bigquery"
 	_ "github.com/viant/sqlx/metadata/product/mysql"
+	_ "github.com/viant/sqlx/metadata/product/oracle"
 	_ "github.com/viant/sqlx/metadata/product/pg"
 	_ "github.com/viant/sqlx/metadata/product/sqlite"
 )

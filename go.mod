@@ -8,6 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/lib/pq v1.10.6
+	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/stretchr/testify v1.10.0
 	github.com/viant/aerospike v0.2.7
 	github.com/viant/afs v1.26.2
@@ -18,7 +19,7 @@ require (
 	github.com/viant/mcp-protocol v0.5.7
 	github.com/viant/scy v0.25.1
 	github.com/viant/sqlparser v0.8.1
-	github.com/viant/sqlx v0.19.1
+	github.com/viant/sqlx v0.20.0
 	github.com/viant/structology v0.7.1
 	github.com/viant/tagly v0.2.0
 	github.com/viant/velty v0.2.0
@@ -105,5 +106,3 @@ require (
 	modernc.org/strutil v1.1.3 // indirect
 	modernc.org/token v1.0.0 // indirect
 )
-
-replace github.com/viant/sqlx => ../sqlx

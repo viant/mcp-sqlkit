@@ -3,6 +3,10 @@ package connector
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strconv"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/viant/jsonrpc"
 	"github.com/viant/mcp-protocol/client"
@@ -10,16 +14,13 @@ import (
 	"github.com/viant/mcp-sqlkit/auth"
 	"github.com/viant/mcp-sqlkit/db/connector/meta"
 	"github.com/viant/structology/conv"
-	"reflect"
-	"strconv"
-	"strings"
 )
 
 // ConnectionInput is the structure the user supplies when adding a new connector. It
 // purposefully omits sensitive data like secrets.
 type ConnectionInput struct {
 	Name    string `json:"name" description:"Connector name"`
-	Driver  string `json:"driver" description:"Connector driver" choice:"mysql" choice:"bigquery" choice:"postgres"  `
+	Driver  string `json:"driver" description:"Connector driver" choice:"mysql" choice:"bigquery" choice:"postgres" choice:"oracle" choice:"sqlite"  `
 	Host    string `json:"host,omitempty" description:"Host"`
 	Port    int    `json:"port,omitempty" description:"Port"`
 	Project string `json:"project,omitempty" description:"Project"`
