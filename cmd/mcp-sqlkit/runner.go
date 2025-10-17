@@ -141,6 +141,9 @@ func coreOptions(service *mcp.Service) []mcpsrv.Option {
 		mcpsrv.WithNewHandler(mcp.NewHandler(service)),
 		mcpsrv.WithCustomHTTPHandler("/ui/interaction/", service.UI().Handle),
 		mcpsrv.WithImplementation(schema.Implementation{Name: "mcp-sqlkit", Version: "1.0"}),
+		// Enable root redirect so base URL (e.g. http://localhost:5000) routes
+		// to the active transport (SSE by default).
+		mcpsrv.WithRootRedirect(true),
 	}
 }
 

@@ -84,6 +84,11 @@ The server will print something similar to:
 At this point you can connect with any MCP client and invoke the tools listed
 in the next section.
 
+Tip: You can use the base URL
+
+- The server redirects the root path (`/`) to the active transport (SSE by default).
+- That means `http://localhost:5000` works out of the box without specifying `/sse` or `/mcp`.
+
 
 ## Configuration
 
