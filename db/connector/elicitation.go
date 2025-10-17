@@ -110,6 +110,7 @@ func (s *Service) requestConnectorElicit(ctx context.Context, impl client.Operat
 	if !auth.IsDefaultNamespace(namespace) {
 		messageSuffix = fmt.Sprintf(" in namespace %s", namespace)
 	}
+
 	elicitResult, err := impl.Elicit(ctx, &jsonrpc.TypedRequest[*schema.ElicitRequest]{Request: &schema.ElicitRequest{
 		Params: schema.ElicitRequestParams{
 			ElicitationId:   uuid.New().String(),

@@ -37,15 +37,27 @@ func (s *Service) ListConnectors(ctx context.Context, input *ListInput) *ListOut
 	output := &ListOutput{Status: "ok"}
 	// Use the existing List method.
 	connectors := s.List(ctx)
-	if connectors == nil {
+
+	// If nothing is configured yet, try to ensure a default connection exists,
+	// then re-read the list.
+	if len(connectors) == 0 {
+		_, _ = s.Connection(ctx, "dev")
+		connectors = s.List(ctx)
+	}
+	if len(connectors) == 0 {
 		return output
 	}
 
 	// Filter connectors based on pattern if provided
 	var filteredConnectors []*Connector
-	if input.Pattern != "" {
+	// Be tolerant to nil input (MCP may send null params).
+	pattern := ""
+	if input != nil {
+		pattern = input.Pattern
+	}
+	if pattern != "" {
 		for _, c := range connectors {
-			if strings.Contains(c.Name, input.Pattern) {
+			if strings.Contains(c.Name, pattern) {
 				filteredConnectors = append(filteredConnectors, c)
 			}
 		}
