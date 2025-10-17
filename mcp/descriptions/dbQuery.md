@@ -1,5 +1,5 @@
 Execute a read-only SQL query and return the result set as JSON.
-Avoid large result use LIMIT or OFFSET based on driver
+Avoid large     result use LIMIT or OFFSET based on driver
 
 Pre-Flight
 - Confirm a connector that serves the database referenced by the query.

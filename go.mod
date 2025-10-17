@@ -14,9 +14,9 @@ require (
 	github.com/viant/afs v1.26.2
 	github.com/viant/bigquery v0.5.1
 	github.com/viant/firebase v0.1.1
-	github.com/viant/jsonrpc v0.7.5
-	github.com/viant/mcp v0.5.3-0.20250717163906-0f71fbd5752e
-	github.com/viant/mcp-protocol v0.5.7
+	github.com/viant/jsonrpc v0.11.0
+	github.com/viant/mcp v0.7.0
+	github.com/viant/mcp-protocol v0.5.10
 	github.com/viant/scy v0.25.1
 	github.com/viant/sqlparser v0.8.1
 	github.com/viant/sqlx v0.20.0
@@ -67,6 +67,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
+	github.com/viant/gosh v0.2.1 // indirect
 	github.com/viant/parsly v0.3.3-0.20240717150634-e1afaedb691b // indirect
 	github.com/viant/toolbox v0.36.0 // indirect
 	github.com/viant/x v0.3.0 // indirect
