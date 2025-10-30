@@ -110,7 +110,9 @@ applied.
     //   gsecret://... / vault://... → external managers
     "secretBaseLocation": "file://~/.secret/mcpt"
   },
-  // Put tool outputs in the `data` field instead of the default `text`.
+  // Tool responses include JSON in BOTH content.text and content.data
+  // for broad client compatibility. The `useData` flag is retained for
+  // backward compatibility and no longer changes the response shape.
   "useData": true
 }
 ```
@@ -196,6 +198,11 @@ The toolbox registers the following MCP tools (see `mcp/tool.go`).
 | `dbQuery`              | Execute a SQL query and return the result set | `db/query.Input`            |
 | `dbExec`               | Execute DML/DDL and return rows affected      | `db/exec.Input`             |
 | `dbListConnections`    | List connectors visible to the caller         | `db/connector.ListInput`    |
+
+Notes
+- dbListConnections returns `data` as an array of items with shape `{name, driver, dsn}`. When no connectors are present, `data` is an empty array.
+- Tool responses include the JSON payload in both `content.text` and `content.data` fields to accommodate different MCP clients.
+- On the very first call when no connectors exist, the server may trigger an elicitation flow (form + secret). After secrets are provided, subsequent `dbListConnections` calls return the newly created connector.
 | `dbSetConnection`      | Create or update a connector (upsert)         | `db/connector.ConnectionInput` |
 | `dbListTables`         | List tables for a given catalog/schema        | `db/meta.ListTablesInput`   |
 | `dbListColumns`        | List columns for a given table                | `db/meta.ListColumnsInput`  |
@@ -329,6 +336,33 @@ Minimal JSON snippet enabling token verification (see `mcp.Config`):
 When the `policy` block is omitted the toolbox falls back to a shared
 namespace called **`default`** – useful for local development or CI where no
 identity provider is available.
+
+### Namespaces and CLI flags
+
+- With `-o` (OAuth client) only: the namespace is derived from a hash of the access token, isolating connectors per token instance.
+- With `-o -i` (OAuth + ID token): the namespace is derived from the ID-token subject/email and remains stable across access-token refreshes.
+- Without `-o`/`-i`: the shared `default` namespace is used.
+
+Security note (remote deployments)
+
+- For multi-user remote deployments, ensure the server is configured to require ID tokens and that clients pass them (use `-o -i` and set `policy.requireIdentityToken: true`).
+- Running without `-i` or without an OAuth policy can place users in the same namespace (either `default` or a shared access-token hash), which can unintentionally expose connectors/secrets across users if the same access token is reused (e.g., via a shared service account or proxy).
+- Recommended: enable `requireIdentityToken` and use per-user ID tokens to guarantee user-scoped isolation across sessions and hosts.
+
+### Namespace isolation
+
+SQLKit enforces strict per-namespace isolation so that connection metadata and secrets do not leak between users:
+
+- Per-request scoping: every tool call resolves the caller’s namespace from the request context and operates only within that namespace.
+- Registry isolation: connectors are stored under `Namespaces[namespace]`; listing and lookups cannot see entries from other namespaces.
+- Secret isolation: secrets are stored at `<SecretBaseLocation>/<driver>/<database>/<namespace>` (or `<...>.json` depending on the storage scheme), so credentials are physically separated per namespace.
+- Elicitation isolation: the secret-elicitation flow binds a pending item to the namespace; upon completion, activation occurs only in that namespace.
+
+Implications and tips:
+
+- -o only (access token): namespaces are derived from a hash of the current token. If the client rotates tokens frequently, you may see different namespaces across calls (over‑isolation), but no leakage occurs.
+- -o -i (ID token): namespaces are derived from subject/email and remain stable across token refreshes; recommended for user‑scoped isolation.
+- Shared connectors: to intentionally share, preconfigure connectors under `namespace: "default"` (or another explicit namespace) in the config.
 
 
 ## Secure connector-secret flow
