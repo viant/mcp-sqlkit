@@ -12,7 +12,7 @@ type Options struct {
 	Oauth2Config string `short:"o" long:"oauth2config" description:"Path to JSON OAuth2 configuration file"`
 	UserIdToken  bool   `short:"i"  long:"idToken" description:"flag to use id token"`
 
-	// Base URL for secrets storage (scy). Supports mem://, file://, gsecret://, vault://, ...
+	// Base URL for secrets storage (scy). Supports mem://, file://,
 	// Defaults to in-memory AFS storage.
-	SecretBaseLocation string `long:"secrets" description:"Base URL for secrets storage (mem://, file://, gsecret://, vault://, ...)" default:"mem://localhost/mcp-sqlkit/.secret/"`
+	SecretBaseLocation string `long:"secrets" description:"Base URL for secrets storage (mem://, file://, gcp://secretmanager/projects/xxxx/   ... see for list of secure connector  https://github.com/viant/afsc	)" default:"mem://localhost/mcp-sqlkit/.secret/"`
 }
