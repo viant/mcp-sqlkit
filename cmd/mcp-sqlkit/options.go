@@ -14,5 +14,5 @@ type Options struct {
 
 	// Base URL for secrets storage (scy). Supports mem://, file://,
 	// Defaults to in-memory AFS storage.
-	SecretBaseLocation string `long:"secrets" description:"Base URL for secrets storage (mem://, file://, gcp://secretmanager/projects/xxxx/   ... see for list of secure connector  https://github.com/viant/afsc	)" default:"mem://localhost/mcp-sqlkit/.secret/"`
+	SecretBaseLocation string `long:"secretsBase" description:"Base URL for secrets storage (mem://, file://, gcp://secretmanager/projects/xxxx/   ... see for list of secure connector  https://github.com/viant/afsc	)" default:"mem://localhost/mcp-sqlkit/.secret/"`
 }

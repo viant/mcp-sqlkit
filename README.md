@@ -68,14 +68,24 @@ The easiest way to try the toolbox is to run the server with both HTTP and
 STDIO transports enabled:
 
 
-```bash cd
-go run ./cmd/mcp-sqlkit -a :5000 
+```bash
+go run ./cmd/mcp-sqlkit -a :5000 --secretsBase mem://localhost/mcp-sqlkit/.secret/
+```
+
+Tip: for persistence across restarts, use a file-backed secrets store, e.g.:
+
+```bash
+go run ./cmd/mcp-sqlkit -a :5000 --secretsBase file://~/.secret/mcp-sqlkit
 ```
 
 
 * `-a :5000` – HTTP listen address (omit to disable HTTP transport).
 * `-s`       – enable STDIO transport (useful when the toolbox is launched
                by another process via pipes).
+* `--secretsBase` – base URL for secrets storage (scy-backed). Examples:
+  - `mem://localhost/mcp-sqlkit/.secret/` (default, in-memory)
+  - `file://~/.secret/mcp-sqlkit` (persistent on disk)
+  - `gcp://secretmanager/projects/...` or `vault://...` (external managers)
 
 The server will print something similar to:
 
@@ -116,6 +126,10 @@ applied.
   "useData": true
 }
 ```
+
+CLI overrides
+
+- The `--secretsBase` flag overrides `connector.secretBaseLocation` from the config file.
 
 ### Pre-configured connectors
 
@@ -300,6 +314,7 @@ Key points about secret storage:
   on disk set `connector.secretBaseLocation` to a `file://` path (e.g.
   `file://~/.secret/mcpt`). You can also point it to `gsecret://` or
   `vault://` according to your environment.
+* Prefer the CLI flag `--secretsBase <base-url>` to set the storage location at runtime; it overrides the config and is recommended for persistent or remote deployments.
 
 
 ## Authentication & authorization
