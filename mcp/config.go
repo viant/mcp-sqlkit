@@ -27,9 +27,9 @@ func (c *Config) Init(httpAddr string) {
 		c.Connector = &connector.Config{}
 	}
 
-	// Assign default directory for persisted secrets when not specified.
+	// Default base location for secrets – in-memory AFS.
 	if c.Connector.SecretBaseLocation == "" {
-		c.Connector.SecretBaseLocation = "~/.secret/mcpt"
+		c.Connector.SecretBaseLocation = "mem://localhost/mcp-sqlkit/.secret/"
 	}
 	if c.Connector.CallbackBaseURL == "" {
 		port := "5000"

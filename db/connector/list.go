@@ -2,6 +2,8 @@ package connector
 
 import (
 	"context"
+	"github.com/viant/mcp-protocol/client"
+	"github.com/viant/mcp-protocol/schema"
 	"strings"
 )
 
@@ -21,14 +23,15 @@ type ListOutput struct {
 // List returns all connectors visible in the caller's namespace.
 func (s *Service) List(ctx context.Context) []*Connector {
 	namespace, err := s.auth.Namespace(ctx)
-	if err != nil {
-		return nil
+	if err != nil || namespace == "" {
+		namespace = "default"
 	}
 	ns, ok := s.namespace.Get(namespace)
 	if !ok {
 		return nil
 	}
-	return ns.Connectors.Values()
+	vals := ns.Connectors.Values()
+	return vals
 }
 
 // ListConnectors produces ListOutput with all available connectors. It is a
@@ -39,12 +42,21 @@ func (s *Service) ListConnectors(ctx context.Context, input *ListInput) *ListOut
 	connectors := s.List(ctx)
 
 	// If nothing is configured yet, try to ensure a default connection exists,
-	// then re-read the list.
+	// then re-read the list. Prefer a form-based elicitation to collect
+	// connection details when the client supports it; fall back to the legacy
+	// "dev" name flow otherwise.
 	if len(connectors) == 0 {
-		_, _ = s.Connection(ctx, "dev")
+		if impl, ok := s.mcpClient.(client.Operations); ok && impl.Implements(schema.MethodElicitationCreate) {
+			_, _ = s.requestConnectorForm(ctx, impl, &ConnectionInput{})
+		} else {
+			_, _ = s.Connection(ctx, "dev")
+		}
 		connectors = s.List(ctx)
 	}
 	if len(connectors) == 0 {
+		// Always return an explicit empty array to avoid omitting the field
+		// when marshalled, which some clients interpret as "no data field".
+		output.Data = []interface{}{}
 		return output
 	}
 
@@ -65,9 +77,15 @@ func (s *Service) ListConnectors(ctx context.Context, input *ListInput) *ListOut
 		filteredConnectors = connectors
 	}
 
+	// Return a simplified, serialisation-safe view of connectors to avoid any
+	// potential JSON marshalling issues in clients (no internal fields).
 	output.Data = make([]interface{}, len(filteredConnectors))
 	for i, c := range filteredConnectors {
-		output.Data[i] = c
+		output.Data[i] = map[string]interface{}{
+			"name":   c.Name,
+			"driver": c.Driver,
+			"dsn":    c.DSN,
+		}
 	}
 	return output
 }

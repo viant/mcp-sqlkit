@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	_ "github.com/viant/afs/mem"
 	_ "github.com/viant/mcp-sqlkit/db/driver"
 )
 

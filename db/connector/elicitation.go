@@ -106,14 +106,19 @@ func (s *Service) requestConnectorElicit(ctx context.Context, impl client.Operat
 		Properties: flatProps,
 		Required:   required,
 	}
+	if namespace == "" {
+		// best-effort fallback when auth namespace is not present
+		namespace = "default"
+	}
 	messageSuffix := ""
 	if !auth.IsDefaultNamespace(namespace) {
 		messageSuffix = fmt.Sprintf(" in namespace %s", namespace)
 	}
 
+	elicitID := uuid.New().String()
 	elicitResult, err := impl.Elicit(ctx, &jsonrpc.TypedRequest[*schema.ElicitRequest]{Request: &schema.ElicitRequest{
 		Params: schema.ElicitRequestParams{
-			ElicitationId:   uuid.New().String(),
+			ElicitationId:   elicitID,
 			Message:         fmt.Sprintf("Please provide connection details for %s %s", connectorName, messageSuffix),
 			RequestedSchema: reqSchema,
 		}}})

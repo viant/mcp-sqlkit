@@ -10,17 +10,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/viant/mcp-sqlkit/db/connector"
-	"github.com/viant/mcp-sqlkit/policy"
-	"github.com/viant/scy"
-	"github.com/viant/scy/cred"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"reflect"
 	"syscall"
 	"time"
+
+	"github.com/viant/mcp-sqlkit/db/connector"
+	"github.com/viant/mcp-sqlkit/policy"
+	"github.com/viant/scy"
+	"github.com/viant/scy/cred"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/viant/mcp-protocol/authorization"
@@ -118,7 +118,8 @@ func loadConfig(opts *Options) (*mcp.Config, error) {
 	if aPolicy := cfg.Connector.Policy; aPolicy != nil {
 		if aPolicy.Oauth2Config == nil && opts.Oauth2Config != "" {
 			sec := scy.New()
-			resource := scy.NewResource(reflect.TypeOf(&cred.Oauth2Config{}), opts.Oauth2Config, "blowfish://default")
+
+			resource := scy.EncodedResource(opts.Oauth2Config).Decode(context.Background(), cred.Oauth2Config{})
 			secret, err := sec.Load(context.Background(), resource)
 			if err != nil {
 				return nil, fmt.Errorf("unable to load default OAuth2 secret: %w", err)
@@ -126,10 +127,17 @@ func loadConfig(opts *Options) (*mcp.Config, error) {
 			oauthCfg, ok := secret.Target.(*cred.Oauth2Config)
 			if ok {
 				aPolicy.Oauth2Config = &oauthCfg.Config
+				aPolicy.RequireIdentityToken = opts.UserIdToken
 			} else {
 				return nil, fmt.Errorf("unable to load default OAuth2 config")
 			}
 		}
+	}
+
+	// Override secret base location from CLI when provided (CLI takes precedence
+	// over config file).
+	if opts != nil && opts.SecretBaseLocation != "" {
+		cfg.Connector.SecretBaseLocation = opts.SecretBaseLocation
 	}
 
 	return cfg, nil
@@ -160,7 +168,8 @@ func oauthOptions(cfg *mcp.Config) []mcpsrv.Option {
 				AuthorizationServers: []string{cfg.Connector.Policy.Oauth2Config.Endpoint.AuthURL},
 			},
 		},
-		ExcludeURI: "/sse", // SSE stream stays unauthenticated
+
+		ExcludeURI: "/sse,/ui/interaction/", // allow SSE and UI flow without auth token
 	}
 
 	bff := cfg.Connector.BackendForFrontend
@@ -168,6 +177,7 @@ func oauthOptions(cfg *mcp.Config) []mcpsrv.Option {
 		bff = &serverauth.BackendForFrontend{}
 	}
 	bff.Client = cfg.Connector.Policy.Oauth2Config
+
 	if bff.AuthorizationExchangeHeader == "" {
 		bff.AuthorizationExchangeHeader = flow.AuthorizationExchangeHeader
 	}
@@ -176,6 +186,7 @@ func oauthOptions(cfg *mcp.Config) []mcpsrv.Option {
 		log.Printf("warning: failed to initialise auth service – running without OAuth: %v", err)
 		return nil
 	}
+	// OAuth is enabled; middleware and protected resource handler configured.
 	return []mcpsrv.Option{
 		mcpsrv.WithAuthorizer(authSvc.Middleware),
 		mcpsrv.WithProtectedResourcesHandler(authSvc.ProtectedResourcesHandler),

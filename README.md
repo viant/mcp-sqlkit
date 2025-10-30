@@ -30,6 +30,8 @@ distributed as a single self-contained executable (`mcp-sqlkit`).
 12. [Contributing](#contributing)
 13. [Licence](#licence)
 
+Related open-source MCP servers: see GitHub MCP and Outlook MCP sections below.
+
 
 ## Features
 
@@ -48,8 +50,9 @@ distributed as a single self-contained executable (`mcp-sqlkit`).
   [scy](https://github.com/viant/scy)** (Blowfish-GCM by default) and written
   to an abstract secret URL.  Out-of-the-box SQLKit supports `file://` (local
   disk), `mem://` (in-memory) and any additional schemes implemented by the
-  scy project – for example Cloud Secret Manager, HashiCorp Vault, etc.  The
-  default location is `file://~/.secret/mcpt`.
+  scy project – for example Cloud Secret Manager, HashiCorp Vault, etc.
+  By default secrets are stored in-memory (`mem://`); enable filesystem
+  storage to persist them on disk.
 
 • **MCP secret-elicitation flow** – if a connector lacks a stored secret SQLKit
   uses the MCP `Elicit` API to instruct the **client** to kick-off a
@@ -99,11 +102,14 @@ applied.
 
 ```jsonc
 {
-  // Persisted secret location (defaults to "~/.secret/mcpt")
   "connector": {
-    "secretBaseLocation": "/opt/mcp/secrets"
+    // Base secret location (defaults to mem://localhost/mcp-sqlkit/.secret/)
+    // Use any scy-supported scheme:
+    //   file://~/.secret/mcpt      → persist on disk
+    //   mem://localhost/...        → in-memory (default)
+    //   gsecret://... / vault://... → external managers
+    "secretBaseLocation": "file://~/.secret/mcpt"
   },
-
   // Put tool outputs in the `data` field instead of the default `text`.
   "useData": true
 }
@@ -195,6 +201,35 @@ The toolbox registers the following MCP tools (see `mcp/tool.go`).
 | `dbListColumns`        | List columns for a given table                | `db/meta.ListColumnsInput`  |
 
 
+## GitHub MCP
+
+Open-source companion MCP server that integrates with GitHub. It exposes tools to:
+
+- List repositories, issues, pull requests
+- Create issues and pull requests
+- Add/list comments
+- Explore repository contents (list paths, download files) and optionally check out locally
+
+Getting started:
+
+- Source: https://github.com/viant/mcp-toolbox/tree/main/github
+- Run: `go run ./github/cmd/github-mcp -addr :7789` (in mcp-toolbox)
+
+
+## Outlook MCP
+
+Open-source companion MCP server that integrates with Microsoft 365 (Graph):
+
+- List and send mail
+- List/create calendar events
+- List/create tasks
+
+Getting started:
+
+- Source: https://github.com/viant/mcp-toolbox/tree/main/outlook
+- Run: `go run ./outlook/cmd/outlook-mcp -addr :7788` (in mcp-toolbox)
+
+
 ### Example – query a MySQL database
 
 1. Register a connector (either via `dbSetConnection` or through the browser
@@ -254,9 +289,10 @@ Key points about secret storage:
   secrets in plain text.
 * The location scheme is pluggable – any URL that scy recognises works
   (`file://`, `mem://`, `gsecret://`, `vault://`, …).
-* Changing `SecretBaseLocation` to an empty string switches to `mem://`
-  storage so secrets live only for the lifetime of the process. Great for
-  demos, **not recommended for production**.
+* By default SQLKit stores secrets using `mem://` (in-memory AFS). To persist
+  on disk set `connector.secretBaseLocation` to a `file://` path (e.g.
+  `file://~/.secret/mcpt`). You can also point it to `gsecret://` or
+  `vault://` according to your environment.
 
 
 ## Authentication & authorization

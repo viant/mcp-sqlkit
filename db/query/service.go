@@ -76,11 +76,16 @@ func (r *Service) query(ctx context.Context, input *Input, output *Output) error
 func (r *Service) recordType(ctx context.Context, input *Input, db *sql.DB) (reflect.Type, error) {
 	// -----------------------------------------------------------------------------------------------------------------
 	// Prepare cache key – ensure that semantically equivalent projection lists generate the same key.
-	cacheKey := input.Connector + input.Query
+	// Include auth namespace to avoid cross-user cache bleed when running in auth mode.
+	namespace := "default"
+	if ns, err := r.connectors.Namespace(ctx); err == nil && ns != "" {
+		namespace = ns
+	}
+	cacheKey := namespace + "|" + input.Connector + "|" + input.Query
 	lcQuery := strings.ToLower(input.Query)
 	if strings.Contains(lcQuery, "where ") || strings.Contains(lcQuery, "limit ") || strings.Contains(lcQuery, "order ") {
 		if parsed, _ := sqlparser.ParseQuery(input.Query); parsed != nil {
-			cacheKey = input.Connector + sqlparser.Stringify(parsed.From.X)
+			cacheKey = namespace + "|" + input.Connector + "|" + sqlparser.Stringify(parsed.From.X)
 			for _, column := range parsed.List {
 				cacheKey += sqlparser.Stringify(column.Expr) + column.Alias + ","
 			}

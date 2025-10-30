@@ -165,7 +165,8 @@ func (c *Manager) CancelPending(ctx context.Context, uuid string) error {
 			RequestId: schema.RequestId(requestId),
 		}
 		params, _ := json.Marshal(cancelParams)
-		return pend.MCP.Notify(ctx, &jsonrpc.Notification{Method: schema.MethodNotificationCancel, Params: params})
+		err := pend.MCP.Notify(ctx, &jsonrpc.Notification{Method: schema.MethodNotificationCancel, Params: params})
+		return err
 	}
 	return nil
 }

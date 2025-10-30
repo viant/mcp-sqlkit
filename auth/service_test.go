@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -53,12 +54,23 @@ func TestService_Namespace(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:   "oauth config with token -> derived namespace",
-			policy: &policy.Policy{Oauth2Config: oauthCfg},
+			name:   "oauth config with token and idToken -> derived namespace",
+			policy: &policy.Policy{Oauth2Config: oauthCfg, RequireIdentityToken: true},
 			ctx: context.WithValue(context.Background(), authorization.TokenKey, &authorization.Token{
 				Token: tokenString,
 			}),
 			expectNS: "user@example.com",
+		},
+		{
+			name:   "oauth config with token and no idToken -> hash namespace",
+			policy: &policy.Policy{Oauth2Config: oauthCfg, RequireIdentityToken: false},
+			ctx: context.WithValue(context.Background(), authorization.TokenKey, &authorization.Token{
+				Token: tokenString,
+			}),
+			expectNS: func() string {
+				sum := md5.Sum([]byte(tokenString))
+				return fmt.Sprintf("%x", sum)
+			}(),
 		},
 	}
 

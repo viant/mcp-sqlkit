@@ -313,6 +313,9 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 		http.Error(w, fmt.Sprintf("failed to store secret %v %v", secret.Resource.URL, err), http.StatusInternalServerError)
 		return
 	}
+	// Ensure any cached DB connection is closed so subsequent attempts use
+	// the freshly stored credentials during DSN expansion.
+	_ = pend.Connector.Close()
 
 	db, err := pend.Connector.Db(ctx)
 	if err == nil {

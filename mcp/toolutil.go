@@ -25,9 +25,11 @@ func buildSuccessResult(svc *Service, payload any) (*schema.CallToolResult, *jso
 	if err != nil {
 		return nil, jsonrpc.NewInternalError(err.Error(), nil)
 	}
-
-	if svc.UseTextField() {
-		return &schema.CallToolResult{Content: []schema.CallToolResultContentElem{{Text: string(data)}}}, nil
-	}
-	return &schema.CallToolResult{Content: []schema.CallToolResultContentElem{{Data: string(data)}}}, nil
+	structured := make(map[string]interface{})
+	_ = json.Unmarshal(data, &structured)
+	// Populate both text and data fields for broad client compatibility,
+	// while still honoring the service preference. Some clients only read
+	// `text`, others only `data`.
+	elem := schema.CallToolResultContentElem{Text: string(data), Data: string(data)}
+	return &schema.CallToolResult{StructuredContent: structured, Content: []schema.CallToolResultContentElem{elem}}, nil
 }

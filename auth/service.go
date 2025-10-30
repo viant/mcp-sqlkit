@@ -2,7 +2,10 @@ package auth
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
+	"strings"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/viant/mcp-protocol/authorization"
 	"github.com/viant/mcp-sqlkit/policy"
@@ -21,9 +24,14 @@ type Service struct {
 }
 
 func (s *Service) Namespace(ctx context.Context) (string, error) {
+	// If service is not initialised, fall back to shared default.
+	if s == nil {
+		return defaultNs, nil
+	}
 	// When no OAuth2 configuration is provided, remain in the shared default
-	// namespace to preserve the existing behaviour (backwards-compatibility).
-	if s == nil || s.Policy == nil || s.Policy.Oauth2Config == nil {
+	// namespace to preserve the existing behaviour (backwards-compatibility)
+	// and to support stdio/local flows without tokens.
+	if s.Policy == nil || s.Policy.Oauth2Config == nil {
 		return defaultNs, nil
 	}
 
@@ -46,6 +54,21 @@ func (s *Service) Namespace(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to get token from context, unsupported type %T", tokenValue)
 	}
 
+	// Strip optional "Bearer " prefix if present (case-insensitive).
+	if ls := strings.ToLower(tokenString); strings.HasPrefix(ls, "bearer ") {
+		tokenString = strings.TrimSpace(tokenString[len("Bearer "):])
+	}
+
+	// When OAuth is configured but the server is not requested to use ID tokens
+	// (i.e. running with -o but without -i), we cannot derive a stable subject
+	// from access tokens. In this case, scope the namespace by hashing the
+	// token string to ensure per-token isolation.
+	if s.Policy != nil && !s.Policy.RequireIdentityToken {
+		sum := md5.Sum([]byte(tokenString))
+		ns := fmt.Sprintf("%x", sum)
+		return ns, nil
+	}
+
 	// If verifier service is not configured (i.e. New() was called without
 	// additional JWT verification settings) we perform a best-effort, safe
 	// extraction of standard claims without validating the signature. This is
@@ -55,7 +78,10 @@ func (s *Service) Namespace(ctx context.Context) (string, error) {
 		if ns := unsafeSubjectOrEmail(tokenString); ns != "" {
 			return ns, nil
 		}
-		return "", fmt.Errorf("unable to extract namespace from token")
+		// Fallback: no ID-token/claims available – isolate by hashing token string.
+		sum := md5.Sum([]byte(tokenString))
+		ns := fmt.Sprintf("%x", sum)
+		return ns, nil
 	}
 
 	claims, err := s.verifierService.VerifyClaims(ctx, tokenString)
@@ -68,7 +94,10 @@ func (s *Service) Namespace(ctx context.Context) (string, error) {
 		namespace = claims.Subject
 	}
 	if namespace == "" {
-		return "", fmt.Errorf("namespace is empty in token claims")
+		// Verified token but missing subject/email – use hash for isolation.
+		sum := md5.Sum([]byte(tokenString))
+		ns := fmt.Sprintf("%x", sum)
+		return ns, nil
 	}
 	return namespace, nil
 }

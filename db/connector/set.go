@@ -86,8 +86,8 @@ func (s *Service) Set(ctx context.Context, connector *Connector) (*AddOutput, er
 
 func (s *Service) GeneratePendingSecret(ctx context.Context, connector *Connector) (*PendingSecret, error) {
 	namespace, err := s.auth.Namespace(ctx)
-	if err != nil {
-		return nil, err
+	if err != nil || namespace == "" {
+		namespace = "default"
 	}
 	ns, ok := s.namespace.Get(namespace)
 	if !ok {
@@ -104,31 +104,30 @@ func (s *Service) GeneratePendingSecret(ctx context.Context, connector *Connecto
 
 	encodedNS := url.QueryEscape(namespace)
 
-	// Determine resource URL for secret storage.  When SecretBaseLocation is
-	// provided, store the secret on the local filesystem under the following
-	// layout:
-	//   <base>/<driver>/<dbname>/<namespace>
-	// Otherwise fall back to in-memory storage.
+	// Determine resource URL for secret storage using a single base URL.
+	// Compute dbName once; used in all schemes.
+	dbName := extractDBName(connector.DSN)
+	base := s.Config.SecretBaseLocation
+	if base == "" {
+		base = "mem://localhost/mcp-sqlkit/.secret/"
+	}
 	var resURL string
-	if base := s.Config.SecretBaseLocation; base != "" {
-		// Expand a leading ~ to the user's home directory so that the default
-		// value works cross-platform without additional configuration.
-		if strings.HasPrefix(base, "~/") {
+	if strings.HasPrefix(base, "file://") {
+		fsBase := strings.TrimPrefix(base, "file://")
+		if strings.HasPrefix(fsBase, "~/") {
 			if home, err := os.UserHomeDir(); err == nil {
-				base = filepath.Join(home, base[2:])
+				fsBase = filepath.Join(home, fsBase[2:])
 			}
 		}
-
-		// Attempt to extract database name from DSN so that the path includes
-		// driver, dbname and namespace as requested.
-		dbName := extractDBName(connector.DSN)
-
-		fullPath := filepath.Join(base, connector.Driver, dbName, encodedNS)
-		// Convert to URI – scy expects a file:// scheme for filesystem secrets.
+		fullPath := filepath.Join(fsBase, connector.Driver, dbName, encodedNS)
 		resURL = fmt.Sprintf("file://%s", filepath.ToSlash(fullPath))
 	} else {
-		// Legacy behaviour – keep secret in memory.
-		resURL = fmt.Sprintf("mem://localhost/%s/%s", connector.Name, encodedNS)
+		// Generic scheme (mem://, vault://, gsecret://, ...)
+		// Ensure single trailing slash then append segments and .json suffix.
+		if !strings.HasSuffix(base, "/") {
+			base += "/"
+		}
+		resURL = fmt.Sprintf("%s%s/%s/%s.json", base, connector.Driver, dbName, encodedNS)
 	}
 
 	if metaCfg.CredType == reflect.TypeOf(&cred.Basic{}) {

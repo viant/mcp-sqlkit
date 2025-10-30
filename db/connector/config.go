@@ -12,13 +12,13 @@ type Config struct {
 
 	BackendForFrontend *auth.BackendForFrontend `json:"backendForFrontend,omitempty"  yaml:"backendForFrontend,omitempty"`
 
-	// SecretBaseLocation specifies the base directory where connection secrets
-	// should be stored. When left empty, secrets are kept in-memory only. The
-	// default value (~/.secret/mcpt) is assigned by mcp.Config.Init().
-	//
-	// The final secret location for a connector will be constructed as:
-	//   <SecretBaseLocation>/<driver>/<dbname>/<namespace>
+	// SecretBaseLocation specifies the base URL where connection secrets should
+	// be stored. It can be any scheme supported by scy (e.g. mem://, file://,
+	// gsecret://, vault://, ...). The default is an in-memory AFS path:
+	//   mem://localhost/mcp-sqlkit/.secret/
+	// The final secret location for a connector is constructed as:
+	//   <SecretBaseLocation>/<driver>/<dbname>/<namespace>[.json]
 	// ensuring secrets are isolated per driver, database name and caller
-	// namespace.
+	// namespace. The optional .json suffix is appended for non-file schemes.
 	SecretBaseLocation string
 }

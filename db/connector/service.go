@@ -63,6 +63,14 @@ func NewService(manager *Manager, mcp client.Operations) *Service {
 	}
 }
 
+// Namespace returns the caller namespace derived from auth token when enabled.
+func (s *Service) Namespace(ctx context.Context) (string, error) {
+	if s == nil || s.Manager == nil {
+		return "default", nil
+	}
+	return s.auth.Namespace(ctx)
+}
+
 // AddConnection orchestrates creation/upsert of a connector with a two-step
 // elicitation flow: (1) form for non-secret parameters when missing; (2) out-of-
 // band browser flow for secrets. It returns an AddOutput describing the state.
@@ -196,14 +204,18 @@ func (s *Service) requestConnectorForm(ctx context.Context, impl client.Operatio
 
 	reqSchema := schema.ElicitRequestParamsRequestedSchema{Type: "object", Properties: flatProps, Required: required}
 
-	namespace, _ := s.auth.Namespace(ctx)
+	namespace, nserr := s.auth.Namespace(ctx)
+	if nserr != nil || namespace == "" {
+		namespace = "default"
+	}
 	messageSuffix := ""
 	if !auth.IsDefaultNamespace(namespace) {
 		messageSuffix = fmt.Sprintf(" in namespace %s", namespace)
 	}
 
+	elicitID := uuid.New().String()
 	elicitResult, err := impl.Elicit(ctx, &jsonrpc.TypedRequest[*schema.ElicitRequest]{Request: &schema.ElicitRequest{Params: schema.ElicitRequestParams{
-		ElicitationId:   uuid.New().String(),
+		ElicitationId:   elicitID,
 		Message:         fmt.Sprintf("Please provide connection details%s", messageSuffix),
 		RequestedSchema: reqSchema,
 	}}})
