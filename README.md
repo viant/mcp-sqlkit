@@ -75,7 +75,18 @@ go run ./cmd/mcp-sqlkit -a :5000 --secretsBase mem://localhost/mcp-sqlkit/.secre
 Tip: for persistence across restarts, use a file-backed secrets store, e.g.:
 
 ```bash
-go run ./cmd/mcp-sqlkit -a :5000 --secretsBase file://~/.secret/mcp-sqlkit
+// CI_AGENCY.json
+[
+  { "ID": "$Sequences.CI_AGENCY/${tag}.1", "ACCOUNT_ID": "$Sequences.CI_ACCOUNT/${tag}.default", "NAME": "Agency ${Sequences.CI_AGENCY}" }
+]
+// expect/db/valid_audience_insert.json
+{ "NAME": "Inserted Audience", "AD_ORDER_ID": "$AsInt(${adOrder1.ID})", "STATUS": 1 }
+{
+  "NAME": "Inserted Audience",
+  "AD_ORDER_ID": "$AsInt(${adOrder1.ID})",
+  "STATUS": 1
+}
+ --secretsBase file://~/.secret/mcp-sqlkit
 ```
 
 
@@ -130,6 +141,10 @@ applied.
 CLI overrides
 
 - The `--secretsBase` flag overrides `connector.secretBaseLocation` from the config file.
+- The `--public-base-url` flag sets the public base URL used in out-of-band (OOB)
+  secret flows and OAuth redirects. Use this when the server is behind a proxy or
+  running in Kubernetes so that generated links point to the externally reachable host,
+  e.g. `--public-base-url http://mcp-sqlkit.agently.svc.cluster.local:7789`.
 
 ### Pre-configured connectors
 

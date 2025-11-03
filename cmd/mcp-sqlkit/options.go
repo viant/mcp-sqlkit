@@ -12,6 +12,11 @@ type Options struct {
 	Oauth2Config string `short:"o" long:"oauth2config" description:"Path to JSON OAuth2 configuration file"`
 	UserIdToken  bool   `short:"i"  long:"idToken" description:"flag to use id token"`
 
+	// Public base URL used for OOB flows and callbacks, e.g.
+	//   http://mcp-sqlkit.agently.svc.cluster.local:7789
+	// When provided, overrides any derived localhost base.
+	PublicBaseURL string `long:"public-base-url" description:"Public base URL for OOB callbacks (e.g. http://mcp-sqlkit.agently.svc.cluster.local:7789)"`
+
 	// Base URL for secrets storage (scy). Supports mem://, file://,
 	// Defaults to in-memory AFS storage.
 	SecretBaseLocation string `long:"secretsBase" description:"Base URL for secrets storage (mem://, file://, gcp://secretmanager/projects/xxxx/   ... see for list of secure connector  https://github.com/viant/afsc	)" default:"mem://localhost/mcp-sqlkit/.secret/"`

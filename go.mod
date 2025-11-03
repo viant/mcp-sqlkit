@@ -15,7 +15,7 @@ require (
 	github.com/viant/bigquery v0.5.1
 	github.com/viant/firebase v0.1.1
 	github.com/viant/jsonrpc v0.15.0
-	github.com/viant/mcp v0.8.0
+	github.com/viant/mcp v0.8.2-0.20251031142254-0ee76fc6d8f9
 	github.com/viant/mcp-protocol v0.6.0
 	github.com/viant/scy v0.25.1
 	github.com/viant/sqlparser v0.8.1
@@ -108,4 +108,3 @@ require (
 	modernc.org/token v1.0.0 // indirect
 )
 
-replace github.com/viant/mcp => ../mcp

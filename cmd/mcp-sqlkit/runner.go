@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -132,6 +133,14 @@ func loadConfig(opts *Options) (*mcp.Config, error) {
 				return nil, fmt.Errorf("unable to load default OAuth2 config")
 			}
 		}
+	}
+
+	// Override callback base URL (public base) from CLI when provided.
+	if opts != nil && opts.PublicBaseURL != "" {
+		if cfg.Connector == nil {
+			cfg.Connector = &connector.Config{}
+		}
+		cfg.Connector.CallbackBaseURL = strings.TrimRight(opts.PublicBaseURL, "/")
 	}
 
 	// Override secret base location from CLI when provided (CLI takes precedence
