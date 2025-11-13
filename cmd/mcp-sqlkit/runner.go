@@ -154,7 +154,7 @@ func loadConfig(opts *Options) (*mcp.Config, error) {
 
 // coreOptions returns server options that are always enabled.
 func coreOptions(service *mcp.Service) []mcpsrv.Option {
-	return []mcpsrv.Option{
+	opts := []mcpsrv.Option{
 		mcpsrv.WithNewHandler(mcp.NewHandler(service)),
 		mcpsrv.WithCustomHTTPHandler("/ui/interaction/", service.UI().Handle),
 		mcpsrv.WithImplementation(schema.Implementation{Name: "mcp-sqlkit", Version: "1.0"}),
@@ -162,6 +162,12 @@ func coreOptions(service *mcp.Service) []mcpsrv.Option {
 		// to the active transport (SSE by default).
 		mcpsrv.WithRootRedirect(true),
 	}
+	// Register OAuth callback handler if UI service is available
+	if service.UI() != nil {
+		opts = append(opts, mcpsrv.WithCustomHTTPHandler("/ui/oauth/callback", service.UI().HandleOAuthCallback))
+	}
+	return opts
+
 }
 
 // oauthOptions conditionally builds auth-related server options.

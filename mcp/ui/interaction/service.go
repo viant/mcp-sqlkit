@@ -16,10 +16,10 @@ import (
 	"github.com/viant/bigquery"
 	"github.com/viant/mcp-sqlkit/db/connector"
 	"github.com/viant/scy"
-	"github.com/viant/scy/auth/flow"
 	"github.com/viant/scy/auth/gcp/client"
 	"github.com/viant/scy/cred"
 	"github.com/viant/velty"
+	"golang.org/x/oauth2"
 )
 
 //go:embed asset/basic_cred.html
@@ -41,6 +41,7 @@ func New(connectors *connector.Manager, secrets *scy.Service) *Service {
 
 // Register attaches HTTP handlers to provided mux.
 func (s *Service) Register(mux *http.ServeMux) {
+	mux.HandleFunc("/ui/oauth/callback", s.HandleOAuthCallback)
 	mux.HandleFunc("/ui/interaction/", s.Handle)
 }
 
@@ -53,16 +54,20 @@ func (s *Service) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	uuid := parts[2]
 
-	pend, ok := s.Connector.Pending(uuid)
-	if !ok {
-		http.NotFound(w, r)
+	// Check for status page FIRST, before looking up pending secret
+	// This allows status pages to work even after the pending secret is completed
+	qs := r.URL.Query()
+	status := qs.Get("status")
+	elicitID := qs.Get("elicitationId")
+
+	if status != "" && elicitID != "" {
+		s.renderStatusNotify(w, status, elicitID)
 		return
 	}
 
-	// If this is a status landing (completed/cancelled/error), render minimal page
-	qs := r.URL.Query()
-	if st := qs.Get("status"); st != "" && qs.Get("elicitationId") != "" {
-		s.renderStatusNotify(w, st, qs.Get("elicitationId"))
+	pend, ok := s.Connector.Pending(uuid)
+	if !ok {
+		http.NotFound(w, r)
 		return
 	}
 
@@ -125,18 +130,44 @@ func (s *Service) handleBigQueryConnectionSetup(w http.ResponseWriter, r *http.R
 		return err
 	}
 	query := r.URL.Query()
-	redirectURI := url.Join(s.Connector.Config.CallbackBaseURL, "/ui/interaction/", pend.UUID)
+	// Use a single fixed callback endpoint instead of UUID in path
+	redirectURI := url.Join(s.Connector.Config.CallbackBaseURL, "/ui/oauth/callback")
 	authCode := query.Get("code")
+	state := query.Get("state") // Extract UUID from state parameter
+
 	config := *pend.OAuth2Config
 	config.RedirectURL = redirectURI
+	// Set scopes from connector metadata defaults
+	if len(pend.ConnectorMeta.Defaults.Scopes) > 0 {
+		config.Scopes = pend.ConnectorMeta.Defaults.Scopes
+	}
 
 	if authCode == "" {
-		authorizationURI, err := flow.BuildAuthCodeURL(&config, flow.WithRedirectURI(redirectURI), flow.WithScopes(pend.ConnectorMeta.Defaults.Scopes...))
-		if err != nil {
-			return err
+		// Use standard oauth2 AuthCodeURL which accepts state as first parameter
+		// This passes the UUID via the state parameter
+		// Preserve elicitationId if present in the query string
+		state := pend.UUID
+		if elicitID := r.URL.Query().Get("elicitationId"); elicitID != "" {
+			// Append elicitationId to state (we'll extract it later)
+			// Format: uuid:elicitationId
+			state = pend.UUID + ":" + elicitID
 		}
+		authorizationURI := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
 		http.Redirect(w, r, authorizationURI, http.StatusFound)
 		return nil
+	}
+
+	// Validate state - it may contain UUID:elicitationId format
+	stateParts := strings.Split(state, ":")
+	stateUUID := stateParts[0]
+	if len(stateParts) > 1 && pend.ElicitID == "" {
+		// Extract elicitationId from state if it was preserved
+		pend.ElicitID = strings.Join(stateParts[1:], ":")
+	}
+
+	if stateUUID != pend.UUID {
+		http.Error(w, "invalid state parameter", http.StatusBadRequest)
+		return fmt.Errorf("state mismatch: expected %s, got %s", pend.UUID, stateUUID)
 	}
 
 	token, err := config.Exchange(r.Context(), authCode)
@@ -159,6 +190,38 @@ func (s *Service) handleBigQueryConnectionSetup(w http.ResponseWriter, r *http.R
 	pend.Connector.DSN += firstSeparator + "oauth2ClientURL=" + nurl.QueryEscape(configURL) + "&oauth2TokenURL=" + nurl.QueryEscape(tokenURI)
 	s.handleCompletion(w, r, pend)
 	return nil
+}
+
+// HandleOAuthCallback  handles the OAuth callback from Google
+// It extracts the UUID from the state parameter and routes to the existing handler
+func (s *Service) HandleOAuthCallback(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	state := query.Get("state") // This contains the UUID (and possibly elicitationId)
+
+	if state == "" {
+		http.Error(w, "missing state parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Extract UUID from state (maybe in format uuid:elicitationId)
+	stateParts := strings.Split(state, ":")
+	uuid := stateParts[0]
+
+	pend, ok := s.Connector.Pending(uuid)
+	if !ok {
+		http.Error(w, "invalid or expired state", http.StatusBadRequest)
+		return
+	}
+
+	// Preserve elicitationId if it was in the state
+	if len(stateParts) > 1 && pend.ElicitID == "" {
+		pend.ElicitID = strings.Join(stateParts[1:], ":")
+	}
+
+	// Route to the existing interaction endpoint with the auth code
+	// This will trigger handleBigQueryConnectionSetup again, but this time with authCode
+	redirectURL := fmt.Sprintf("/ui/interaction/%s?%s", uuid, r.URL.RawQuery)
+	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
 func (s *Service) renderBasicCred(w http.ResponseWriter, data map[string]string) {
@@ -341,10 +404,17 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 }
 
 func (s *Service) handleCompletion(w http.ResponseWriter, r *http.Request, pend *connector.PendingSecret) {
-	// Mark pending completed.
+	// Save elicitationId and UUID before completing (which removes from pending map)
+	elicitID := pend.ElicitID
+	uuid := pend.UUID
+
+	// Mark pending completed (removes from pending map)
 	_ = s.Connector.CompletePending(pend.UUID)
+
 	// Redirect to status landing (GET) so the external script can auto-notify+close
-	http.Redirect(w, r, "/ui/interaction/"+pend.UUID+"?elicitationId="+nurl.QueryEscape(pend.ElicitID)+"&status=completed", http.StatusSeeOther)
+	// Note: This redirect will work because we check for status page before looking up pending secret
+	statusURL := "/ui/interaction/" + uuid + "?elicitationId=" + nurl.QueryEscape(elicitID) + "&status=completed"
+	http.Redirect(w, r, statusURL, http.StatusSeeOther)
 }
 
 func (s *Service) postData(r *http.Request) (map[string]string, error) {
