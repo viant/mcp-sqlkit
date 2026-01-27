@@ -85,9 +85,19 @@ func (r *Service) recordType(ctx context.Context, input *Input, db *sql.DB) (ref
 	lcQuery := strings.ToLower(input.Query)
 	if strings.Contains(lcQuery, "where ") || strings.Contains(lcQuery, "limit ") || strings.Contains(lcQuery, "order ") {
 		if parsed, _ := sqlparser.ParseQuery(input.Query); parsed != nil {
-			cacheKey = namespace + "|" + input.Connector + "|" + sqlparser.Stringify(parsed.From.X)
-			for _, column := range parsed.List {
-				cacheKey += sqlparser.Stringify(column.Expr) + column.Alias + ","
+			if parsed.From.X != nil {
+				cacheKey = namespace + "|" + input.Connector + "|" + sqlparser.Stringify(parsed.From.X)
+			}
+			for idx, column := range parsed.List {
+				switch {
+				case column.Expr != nil:
+					cacheKey += sqlparser.Stringify(column.Expr)
+				case column.Alias != "":
+					cacheKey += column.Alias
+				default:
+					cacheKey += "col" + strconv.Itoa(idx)
+				}
+				cacheKey += column.Alias + ","
 			}
 		}
 	}
