@@ -313,6 +313,63 @@ enter the secret.
 • **BigQuery driver** triggers an OAuth2 authorisation code flow and appends
   the obtained token URLs to the DSN automatically.
 
+### BigQuery OAuth Setup
+
+To use BigQuery connectors, you must configure OAuth 2.0 credentials in Google Cloud Console and register the redirect URI.
+
+#### Step 1: Create OAuth 2.0 Credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Navigate to **APIs & Services** → **Credentials**
+3. Click **Create Credentials** → **OAuth client ID**
+4. Choose **Web application** as the application type
+5. Configure the OAuth consent screen if prompted
+
+#### Step 2: Register Redirect URI
+
+In your OAuth 2.0 Client ID settings, add the following **Authorized redirect URI**:
+
+**For production:**
+```
+https://your-domain.com/ui/oauth/callback
+```
+
+**For local development:**
+```
+http://localhost:5000/ui/oauth/callback
+```
+
+Replace `your-domain.com` with your actual server domain and `5000` with your local port if different.
+
+**Important:**
+- The redirect URI must match **exactly** (protocol, domain, port, and path)
+- No trailing slashes
+- Use `https://` for production, `http://` for localhost
+- The path is `/ui/oauth/callback` (not `/ui/interaction/oauth/callback`)
+
+#### Step 3: Start Server with Public Base URL
+
+When running the server, set the `--public-base-url` flag to match your registered redirect URI:
+
+```bash
+# Production
+./mcp-sqlkit --public-base-url https://your-domain.com
+
+# Local development
+./mcp-sqlkit --public-base-url http://localhost:5000
+```
+
+The server will construct the full redirect URI as: `<public-base-url>/ui/oauth/callback`
+
+#### Step 4: Test the Connection
+
+1. Use an MCP client to call `dbSetConnection` with a BigQuery connector
+2. The browser will open to the interaction page
+3. You'll be redirected to Google for authentication
+4. After granting permissions, you'll be redirected back and the connector will be activated
+
+**Note:** The OAuth callback endpoint (`/ui/oauth/callback`) is automatically registered when the server starts. After successful authentication, the window will automatically close and notify the MCP client.
+
 Secrets are encrypted with [scy](https://github.com/viant/scy) and stored at:
 
 ```
