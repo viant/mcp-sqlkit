@@ -19,13 +19,14 @@ import (
 // ConnectionInput is the structure the user supplies when adding a new connector. It
 // purposefully omits sensitive data like secrets.
 type ConnectionInput struct {
-	Name    string `json:"name" description:"Connector name"`
-	Driver  string `json:"driver" description:"Connector driver" choice:"mysql" choice:"bigquery" choice:"postgres" choice:"oracle" choice:"sqlite"  `
-	Host    string `json:"host,omitempty" description:"Host"`
-	Port    int    `json:"port,omitempty" description:"Port"`
-	Project string `json:"project,omitempty" description:"Project"`
-	Db      string `json:"db,omitempty" description:"DB/Dataset"`
-	Options string `json:"options,omitempty" description:"Options"`
+	Name     string `json:"name" description:"Connector name"`
+	Driver   string `json:"driver" description:"Connector driver" choice:"mysql" choice:"bigquery" choice:"postgres" choice:"oracle" choice:"sqlite"  `
+	UserName string `json:"userName,omitempty" description:"User name (optional)"`
+	Host     string `json:"host,omitempty" description:"Host"`
+	Port     int    `json:"port,omitempty" description:"Port"`
+	Project  string `json:"project,omitempty" description:"Project"`
+	Db       string `json:"db,omitempty" description:"DB/Dataset"`
+	Options  string `json:"options,omitempty" description:"Options"`
 }
 
 func (i *ConnectionInput) Init(config *meta.Config) {
@@ -145,7 +146,7 @@ func (s *Service) requestConnectorElicit(ctx context.Context, impl client.Operat
 		Driver: metaInput.Driver,
 		DSN:    metaInput.Expand(metaConfig.DSN),
 	}
-	if _, err := s.Set(ctx, conn); err != nil {
+	if _, err := s.set(ctx, conn, metaInput.UserName); err != nil {
 		return "", err
 	}
 	return conn.Name, nil

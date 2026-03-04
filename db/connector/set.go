@@ -27,10 +27,15 @@ import (
 // value.  The method never returns the secret and therefore is safe over MCP
 // RPC.
 func (s *Service) Set(ctx context.Context, connector *Connector) (*AddOutput, error) {
+	return s.set(ctx, connector, "")
+}
+
+func (s *Service) set(ctx context.Context, connector *Connector, userName string) (*AddOutput, error) {
 	pend, err := s.GeneratePendingSecret(ctx, connector)
 	if err != nil {
 		return nil, err
 	}
+	pend.UserName = userName
 	pend.MCP = s.mcpClient
 	connector.secrets = s.secrets
 

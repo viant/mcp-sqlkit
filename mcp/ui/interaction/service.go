@@ -120,6 +120,7 @@ func (s *Service) handleGet(w http.ResponseWriter, r *http.Request, pend *connec
 		"Db":           db,
 		"Project":      "",
 		"Options":      options,
+		"UserName":     pend.UserName,
 	})
 	return nil
 }
@@ -319,7 +320,10 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 		_ = pend.Connector.Close()
 	}
 
-	username := data["username"]
+	username := strings.TrimSpace(data["username"])
+	if username == "" {
+		username = strings.TrimSpace(pend.UserName)
+	}
 	password := data["password"]
 
 	if act, ok := data["action"]; ok && act == "cancel" {
@@ -341,6 +345,7 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 			"Db":           effDb,
 			"Project":      effProject,
 			"Options":      effOptions,
+			"UserName":     username,
 		})
 		return
 	}
@@ -356,6 +361,7 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 			"Db":           effDb,
 			"Project":      effProject,
 			"Options":      effOptions,
+			"UserName":     username,
 		})
 		return
 	}
@@ -364,6 +370,7 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 		Username: username,
 		Password: password,
 	}
+	pend.UserName = username
 
 	resource := pend.Connector.Secrets
 	resource.SetTarget(reflect.TypeOf(basicCred))
@@ -396,6 +403,7 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 			"Db":           effDb,
 			"Project":      effProject,
 			"Options":      effOptions,
+			"UserName":     username,
 		})
 		return
 	}

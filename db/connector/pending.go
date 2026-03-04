@@ -17,6 +17,7 @@ type PendingSecret struct {
 	Namespace     string
 	ConnectorMeta *meta.Config
 	Connector     *Connector
+	UserName      string
 	NS            *Namespace
 	uiRequest     *jsonrpc.TypedRequest[*schema.ElicitRequest]
 	CallbackURL   string

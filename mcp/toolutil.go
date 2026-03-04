@@ -13,7 +13,10 @@ func buildErrorResult(errMsg string) (*schema.CallToolResult, *jsonrpc.Error) {
 	isErr := true
 	return &schema.CallToolResult{
 		IsError: &isErr,
-		Content: []schema.CallToolResultContentElem{{Text: errMsg}},
+		Content: []schema.CallToolResultContentElem{schema.TextContent{
+			Type: "text",
+			Text: errMsg,
+		}},
 	}, nil
 }
 
@@ -27,9 +30,7 @@ func buildSuccessResult(svc *Service, payload any) (*schema.CallToolResult, *jso
 	}
 	structured := make(map[string]interface{})
 	_ = json.Unmarshal(data, &structured)
-	// Populate both text and data fields for broad client compatibility,
-	// while still honoring the service preference. Some clients only read
-	// `text`, others only `data`.
-	elem := schema.CallToolResultContentElem{Text: string(data), Data: string(data)}
+	// Use text content to keep tool responses readable across MCP clients.
+	elem := schema.TextContent{Type: "text", Text: string(data)}
 	return &schema.CallToolResult{StructuredContent: structured, Content: []schema.CallToolResultContentElem{elem}}, nil
 }

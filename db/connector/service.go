@@ -108,7 +108,7 @@ func (s *Service) AddConnection(ctx context.Context, input *ConnectionInput) (*A
 	}
 	dsn := input.Expand(metaCfg.DSN)
 	conn := &Connector{Name: input.Name, Driver: input.Driver, DSN: dsn}
-	return s.Set(ctx, conn)
+	return s.set(ctx, conn, input.UserName)
 }
 
 // needsForm determines if any required non-secret parameters are missing.
@@ -200,6 +200,11 @@ func (s *Service) requestConnectorForm(ctx context.Context, impl client.Operatio
 				p["default"] = initial.Options
 			}
 		}
+		if initial.UserName != "" {
+			if p, ok := flatProps["userName"].(map[string]interface{}); ok {
+				p["default"] = initial.UserName
+			}
+		}
 	}
 
 	reqSchema := schema.ElicitRequestParamsRequestedSchema{Type: "object", Properties: flatProps, Required: required}
@@ -237,7 +242,7 @@ func (s *Service) requestConnectorForm(ctx context.Context, impl client.Operatio
 		return "", err
 	}
 	conn := &Connector{Name: metaInput.Name, Driver: metaInput.Driver, DSN: metaInput.Expand(metaCfg.DSN)}
-	if _, err := s.Set(ctx, conn); err != nil {
+	if _, err := s.set(ctx, conn, metaInput.UserName); err != nil {
 		return "", err
 	}
 	return conn.Name, nil

@@ -160,9 +160,10 @@ func (c *Manager) CancelPending(ctx context.Context, uuid string) error {
 	if pend.MCP != nil && pend.uiRequest != nil {
 		reason := "cancelled by user"
 		requestId, _ := jsonrpc.AsRequestIntId(pend.uiRequest.Id)
+		requestID := schema.RequestId(requestId)
 		cancelParams := schema.CancelledNotificationParams{
 			Reason:    &reason,
-			RequestId: schema.RequestId(requestId),
+			RequestId: &requestID,
 		}
 		params, _ := json.Marshal(cancelParams)
 		err := pend.MCP.Notify(ctx, &jsonrpc.Notification{Method: schema.MethodNotificationCancel, Params: params})
