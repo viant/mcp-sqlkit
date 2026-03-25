@@ -107,13 +107,32 @@ func loadConfig(opts *Options) (*mcp.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		var cfg *mcp.Config
-		if err := json.Unmarshal(data, &cfg); err != nil {
+		loaded := &mcp.Config{}
+		if err := json.Unmarshal(data, loaded); err != nil {
 			return nil, err
 		}
-		if opts.UseData {
-			cfg.UseData = true // CLI override
+		cfg = loaded
+	}
+
+	if opts.DefaultConnectorsPath != "" {
+		defaultConnectors, err := loadDefaultConnectors(opts.DefaultConnectorsPath)
+		if err != nil {
+			return nil, err
 		}
+		if cfg.Connector == nil {
+			cfg.Connector = &connector.Config{}
+		}
+		cfg.Connector.DefaultConnectors = defaultConnectors
+	}
+
+	if cfg.Connector == nil {
+		cfg.Connector = &connector.Config{}
+	}
+	if cfg.Connector.Policy == nil {
+		cfg.Connector.Policy = &policy.Policy{}
+	}
+	if opts.UseData {
+		cfg.UseData = true // CLI override
 	}
 
 	if aPolicy := cfg.Connector.Policy; aPolicy != nil {
@@ -150,6 +169,37 @@ func loadConfig(opts *Options) (*mcp.Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func loadDefaultConnectors(path string) ([]*connector.Namespaced, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	type connectorOnly struct {
+		DefaultConnectors []*connector.Namespaced `json:"defaultConnectors"`
+	}
+	type wrappedConfig struct {
+		Connector *connectorOnly `json:"connector"`
+	}
+
+	var namespaced []*connector.Namespaced
+	if err := json.Unmarshal(data, &namespaced); err == nil {
+		return namespaced, nil
+	}
+
+	var only connectorOnly
+	if err := json.Unmarshal(data, &only); err == nil && only.DefaultConnectors != nil {
+		return only.DefaultConnectors, nil
+	}
+
+	var wrapped wrappedConfig
+	if err := json.Unmarshal(data, &wrapped); err == nil && wrapped.Connector != nil && wrapped.Connector.DefaultConnectors != nil {
+		return wrapped.Connector.DefaultConnectors, nil
+	}
+
+	return nil, fmt.Errorf("unable to parse default connectors file %s: expected array, {\"defaultConnectors\": [...]}, or {\"connector\":{\"defaultConnectors\":[...]}}", path)
 }
 
 // coreOptions returns server options that are always enabled.

@@ -83,10 +83,10 @@ func (c *Connector) Db(ctx context.Context) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.db = db
 	if atomic.CompareAndSwapUint32(&c.initialized, 0, 1) {
 		go c.ensureActive()
 	}
-	c.db = db
 	return db, nil
 }
 
@@ -94,6 +94,9 @@ func (c *Connector) ensureActive() {
 	for ; atomic.LoadUint32(&c.initialized) == 1; time.Sleep(2 * time.Second) {
 	}
 	{
+		if c.db == nil {
+			return
+		}
 		err := c.db.Ping()
 		if err != nil {
 			c.mux.Lock()

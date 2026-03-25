@@ -1,5 +1,8 @@
 List available SQL connectors and the databases/schemas each can reach.
 
+Registered connectors are returned as soon as they are added to the caller namespace,
+even if credentials will only be resolved lazily on first use.
+
 Usage
 - Use when a user mentions a database but no connector is yet confirmed.
 - Do not assume or default a connector.
@@ -12,4 +15,3 @@ Elicitation
 Shared Rules
 - Never guess or reuse a connector for the wrong DB.
 - Always validate against the list returned by this tool.
-

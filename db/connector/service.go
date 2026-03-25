@@ -37,7 +37,7 @@ func (s *Service) Connection(ctx context.Context, name string) (*Connector, erro
 		return conn, nil
 	}
 	// Intercept typed errors to optionally trigger elicitation
-	if errors.Is(err, ErrNamespaceNotFound) || errors.Is(err, ErrConnectorNotFound) && s.mcpClient != nil && s.mcpClient.Implements(schema.MethodElicitationCreate) {
+	if (errors.Is(err, ErrNamespaceNotFound) || errors.Is(err, ErrConnectorNotFound)) && s.mcpClient != nil && s.mcpClient.Implements(schema.MethodElicitationCreate) {
 		namespace, _ := s.auth.Namespace(ctx)
 		name, err = s.requestConnectorElicit(ctx, s.mcpClient, name, namespace)
 		if err != nil {
@@ -88,15 +88,7 @@ func (s *Service) AddConnection(ctx context.Context, input *ConnectionInput) (*A
 			return nil, fmt.Errorf("client does not support MCP Elicit; provide all required fields: name, driver and driver-specific parameters")
 		}
 		// Run form elicitation to collect/confirm non-secret parameters.
-		name, err := s.requestConnectorForm(ctx, impl, input)
-		if err != nil {
-			return nil, err
-		}
-		// If form-based add succeeded without needing secrets, return ok.
-		// The requestConnectorForm delegates to Add which handles the secret
-		// flow – but it does not return output. To make sure we return state,
-		// re-read the connector by name to build a simple ok output.
-		return &AddOutput{Status: "ok", Connector: name}, nil
+		return s.requestConnectorForm(ctx, impl, input)
 	}
 
 	// Driver present and all required fields provided – validate/expand and
@@ -107,7 +99,7 @@ func (s *Service) AddConnection(ctx context.Context, input *ConnectionInput) (*A
 		return nil, err
 	}
 	dsn := input.Expand(metaCfg.DSN)
-	conn := &Connector{Name: input.Name, Driver: input.Driver, DSN: dsn}
+	conn := &Connector{Name: input.Name, Driver: input.Driver, DSN: dsn, Secrets: input.SecretResource()}
 	return s.set(ctx, conn, input.UserName)
 }
 
@@ -136,8 +128,8 @@ func (s *Service) needsForm(ctx context.Context, in *ConnectionInput) bool {
 
 // requestConnectorForm elicits a form to collect/confirm non-secret params and
 // upon acceptance expands DSN and triggers secret OOB flow via Add(). It returns
-// the connector name on success.
-func (s *Service) requestConnectorForm(ctx context.Context, impl client.Operations, initial *ConnectionInput) (string, error) {
+// the same AddOutput shape as a direct dbSetConnection call.
+func (s *Service) requestConnectorForm(ctx context.Context, impl client.Operations, initial *ConnectionInput) (*AddOutput, error) {
 	// Build schema with dynamic required fields based on DSN placeholders – when
 	// driver is missing, default required are just name/driver.
 	props, _ := schema.StructToProperties(reflect.TypeOf(ConnectionInput{}))
@@ -200,6 +192,16 @@ func (s *Service) requestConnectorForm(ctx context.Context, impl client.Operatio
 				p["default"] = initial.Options
 			}
 		}
+		if initial.SecretURL != "" {
+			if p, ok := flatProps["secretURL"].(map[string]interface{}); ok {
+				p["default"] = initial.SecretURL
+			}
+		}
+		if initial.SecretKey != "" {
+			if p, ok := flatProps["secretKey"].(map[string]interface{}); ok {
+				p["default"] = initial.SecretKey
+			}
+		}
 		if initial.UserName != "" {
 			if p, ok := flatProps["userName"].(map[string]interface{}); ok {
 				p["default"] = initial.UserName
@@ -225,25 +227,22 @@ func (s *Service) requestConnectorForm(ctx context.Context, impl client.Operatio
 		RequestedSchema: reqSchema,
 	}}})
 	if err != nil || elicitResult == nil {
-		return "", err
+		return nil, err
 	}
 	if elicitResult.Action != schema.ElicitResultActionAccept {
-		return "", fmt.Errorf("user: reject adding connection %v", elicitResult.Action)
+		return nil, fmt.Errorf("user: reject adding connection %v", elicitResult.Action)
 	}
 
 	// Map content to ConnectionInput.
 	var metaInput ConnectionInput
 	if err := mapToStruct(elicitResult.Content, &metaInput); err != nil {
-		return "", err
+		return nil, err
 	}
 	metaCfg := s.matchMeta(metaInput.Driver)
 	metaInput.Init(metaCfg)
 	if err := metaInput.Validate(metaCfg); err != nil {
-		return "", err
+		return nil, err
 	}
-	conn := &Connector{Name: metaInput.Name, Driver: metaInput.Driver, DSN: metaInput.Expand(metaCfg.DSN)}
-	if _, err := s.set(ctx, conn, metaInput.UserName); err != nil {
-		return "", err
-	}
-	return conn.Name, nil
+	conn := &Connector{Name: metaInput.Name, Driver: metaInput.Driver, DSN: metaInput.Expand(metaCfg.DSN), Secrets: metaInput.SecretResource()}
+	return s.set(ctx, conn, metaInput.UserName)
 }

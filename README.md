@@ -145,6 +145,7 @@ CLI overrides
   secret flows and OAuth redirects. Use this when the server is behind a proxy or
   running in Kubernetes so that generated links point to the externally reachable host,
   e.g. `--public-base-url http://mcp-sqlkit.agently.svc.cluster.local:7789`.
+- The `--default-connectors` flag (short form `-d`) loads a JSON file containing only default connector registrations and overrides `connector.defaultConnectors` from the main config file.
 
 ### Pre-configured connectors
 
@@ -197,8 +198,54 @@ Example:
 }
 ```
 
+If you prefer to bootstrap connectors without a full config file, pass a connectors-only file with `--default-connectors` (or `-d`). Accepted shapes are:
+
+```json
+[
+  {
+    "namespace": "alice@example.com",
+    "connectors": [
+      {
+        "name": "analytics",
+        "driver": "mysql",
+        "dsn": "$Username:$Password@tcp(db.prod:3306)/analytics?parseTime=true",
+        "secrets": {
+          "URL": "file:///Users/awitas/.secret/mcp-sqlkit/alice/analytics",
+          "Key": "blowfish://default"
+        }
+      }
+    ]
+  }
+]
+```
+
+or:
+
+```json
+{
+  "defaultConnectors": [
+    {
+      "namespace": "alice@example.com",
+      "connectors": [
+        {
+          "name": "analytics",
+          "driver": "mysql",
+          "dsn": "$Username:$Password@tcp(db.prod:3306)/analytics?parseTime=true"
+        }
+      ]
+    }
+  ]
+}
+```
+
 On start-up SQLKit persists any provided secrets (if they are not yet stored)
 and registers the connectors under their respective namespaces.
+
+Connector registration is keyed by namespace plus connector name. When a
+connector carries an explicit `secrets.URL`, SQLKit preserves that secret
+location exactly and lists the connector immediately, even before the first
+database use. Credential resolution stays lazy and happens only when a tool
+actually opens the connector.
 
 Configuration can also be built programmatically – see
 `cmd/mcp-sqlkit/main.go` for a minimal example.

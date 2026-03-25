@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"fmt"
 	"github.com/viant/mcp-protocol/client"
 	"github.com/viant/mcp-protocol/schema"
 	"strings"
@@ -47,8 +48,10 @@ func (s *Service) ListConnectors(ctx context.Context, input *ListInput) *ListOut
 	// "dev" name flow otherwise.
 	if len(connectors) == 0 {
 		if impl, ok := s.mcpClient.(client.Operations); ok && impl.Implements(schema.MethodElicitationCreate) {
+			fmt.Printf("[sqlkit-list] no connectors, triggering form elicitation (elicit supported)\n")
 			_, _ = s.requestConnectorForm(ctx, impl, &ConnectionInput{})
 		} else {
+			fmt.Printf("[sqlkit-list] no connectors, elicit NOT supported, falling back to dev\n")
 			_, _ = s.Connection(ctx, "dev")
 		}
 		connectors = s.List(ctx)

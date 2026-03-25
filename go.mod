@@ -15,8 +15,8 @@ require (
 	github.com/viant/bigquery v0.5.1
 	github.com/viant/firebase v0.1.1
 	github.com/viant/jsonrpc v0.17.0
-	github.com/viant/mcp v0.10.0
-	github.com/viant/mcp-protocol v0.10.0
+	github.com/viant/mcp v0.12.1-0.20260319022137-f7530cb6c395
+	github.com/viant/mcp-protocol v0.11.0
 	github.com/viant/scy v0.25.1
 	github.com/viant/sqlparser v0.8.1
 	github.com/viant/sqlx v0.20.0

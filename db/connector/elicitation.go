@@ -13,20 +13,23 @@ import (
 	"github.com/viant/mcp-protocol/schema"
 	"github.com/viant/mcp-sqlkit/auth"
 	"github.com/viant/mcp-sqlkit/db/connector/meta"
+	"github.com/viant/scy"
 	"github.com/viant/structology/conv"
 )
 
 // ConnectionInput is the structure the user supplies when adding a new connector. It
 // purposefully omits sensitive data like secrets.
 type ConnectionInput struct {
-	Name     string `json:"name" description:"Connector name"`
-	Driver   string `json:"driver" description:"Connector driver" choice:"mysql" choice:"bigquery" choice:"postgres" choice:"oracle" choice:"sqlite"  `
-	UserName string `json:"userName,omitempty" description:"User name (optional)"`
-	Host     string `json:"host,omitempty" description:"Host"`
-	Port     int    `json:"port,omitempty" description:"Port"`
-	Project  string `json:"project,omitempty" description:"Project"`
-	Db       string `json:"db,omitempty" description:"DB/Dataset"`
-	Options  string `json:"options,omitempty" description:"Options"`
+	Name      string `json:"name" description:"Connector name"`
+	Driver    string `json:"driver" description:"Connector driver" choice:"mysql" choice:"bigquery" choice:"postgres" choice:"oracle" choice:"sqlite"  `
+	UserName  string `json:"userName,omitempty" description:"User name (optional)"`
+	Host      string `json:"host,omitempty" description:"Host"`
+	Port      int    `json:"port,omitempty" description:"Port"`
+	Project   string `json:"project,omitempty" description:"Project"`
+	Db        string `json:"db,omitempty" description:"DB/Dataset"`
+	Options   string `json:"options,omitempty" description:"Options"`
+	SecretURL string `json:"secretURL,omitempty" description:"Optional scy secret URL used to resolve connector credentials"`
+	SecretKey string `json:"secretKey,omitempty" description:"Optional scy encryption key for the secret resource"`
 }
 
 func (i *ConnectionInput) Init(config *meta.Config) {
@@ -45,13 +48,13 @@ func (i *ConnectionInput) Init(config *meta.Config) {
 }
 
 func (i *ConnectionInput) Validate(config *meta.Config) error {
-	if config == nil {
-		return fmt.Errorf("invalid driver")
+	if config == nil || config.DSN == "" {
+		return fmt.Errorf("unsupported driver: %s", i.Driver)
 	}
-	if i.Host == "" && strings.Contains(config.DSN, "${Host})") {
+	if i.Host == "" && strings.Contains(config.DSN, "${Host}") {
 		return fmt.Errorf("host cannot be empty")
 	}
-	if i.Port == 0 && strings.Contains(config.DSN, "${Port})") {
+	if i.Port == 0 && strings.Contains(config.DSN, "${Port}") {
 		return fmt.Errorf("port cannot be empty")
 	}
 	return nil
@@ -74,6 +77,13 @@ func (i *ConnectionInput) Expand(dsn string) string {
 		dsn = strings.Replace(dsn, "${Db}", i.Db, 1)
 	}
 	return dsn
+}
+
+func (i *ConnectionInput) SecretResource() *scy.Resource {
+	if i == nil || i.SecretURL == "" {
+		return nil
+	}
+	return scy.NewResource("", i.SecretURL, i.SecretKey)
 }
 
 // Get returns an *Connector by name for the current namespace-less context.
@@ -142,9 +152,10 @@ func (s *Service) requestConnectorElicit(ctx context.Context, impl client.Operat
 		return connectorName, err
 	}
 	conn := &Connector{
-		Name:   metaInput.Name,
-		Driver: metaInput.Driver,
-		DSN:    metaInput.Expand(metaConfig.DSN),
+		Name:    metaInput.Name,
+		Driver:  metaInput.Driver,
+		DSN:     metaInput.Expand(metaConfig.DSN),
+		Secrets: metaInput.SecretResource(),
 	}
 	if _, err := s.set(ctx, conn, metaInput.UserName); err != nil {
 		return "", err

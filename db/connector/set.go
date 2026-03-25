@@ -38,6 +38,12 @@ func (s *Service) set(ctx context.Context, connector *Connector, userName string
 	pend.UserName = userName
 	pend.MCP = s.mcpClient
 	connector.secrets = s.secrets
+	pend.NS.Connectors.Put(connector.Name, connector)
+
+	if s.secretExists(ctx, connector, pend.CredType) {
+		s.pending.Delete(pend.UUID)
+		return &AddOutput{Status: "ok", Connector: connector.Name}, nil
+	}
 
 	// If client can handle the Elicit protocol generate it and optionally wait.
 	if impl, ok := s.mcpClient.(client.Operations); ok && impl.Implements(schema.MethodElicitationCreate) {
@@ -49,6 +55,7 @@ func (s *Service) set(ctx context.Context, connector *Connector, userName string
 		} else {
 			oobURL += "?elicitationId=" + url.QueryEscape(elicitID)
 		}
+		fmt.Printf("[sqlkit-elicit-oob] elicitID=%s connector=%s oobURL=%s\n", elicitID, connector.Name, oobURL)
 		elicitResult, _ := impl.Elicit(ctx, &jsonrpc.TypedRequest[*schema.ElicitRequest]{
 			Request: &schema.ElicitRequest{
 				Params: schema.ElicitRequestParams{
@@ -57,6 +64,7 @@ func (s *Service) set(ctx context.Context, connector *Connector, userName string
 					Mode:          "oob",
 					Url:           oobURL,
 				}}})
+		fmt.Printf("[sqlkit-elicit-oob] result=%v\n", elicitResult)
 
 		if elicitResult != nil {
 			if elicitResult.Action != schema.ElicitResultActionAccept {
@@ -66,13 +74,7 @@ func (s *Service) set(ctx context.Context, connector *Connector, userName string
 		// Wait for secret submission up to 5 min.
 		select {
 		case <-pend.done:
-			if connector.Secrets != nil {
-				res := *connector.Secrets
-				res.SetTarget(pend.CredType)
-				if _, err := s.secrets.Load(ctx, &res); err == nil {
-					pend.NS.Connectors.Put(connector.Name, connector)
-				}
-			} else {
+			if s.secretExists(ctx, connector, pend.CredType) {
 				pend.NS.Connectors.Put(connector.Name, connector)
 			}
 		case <-time.After(5 * time.Minute):
@@ -107,36 +109,8 @@ func (s *Service) GeneratePendingSecret(ctx context.Context, connector *Connecto
 		credType = reflect.TypeOf(cred.Basic{})
 	}
 
-	encodedNS := url.QueryEscape(namespace)
-
-	// Determine resource URL for secret storage using a single base URL.
-	// Compute dbName once; used in all schemes.
-	dbName := extractDBName(connector.DSN)
-	base := s.Config.SecretBaseLocation
-	if base == "" {
-		base = "mem://localhost/mcp-sqlkit/.secret/"
-	}
-	var resURL string
-	if strings.HasPrefix(base, "file://") {
-		fsBase := strings.TrimPrefix(base, "file://")
-		if strings.HasPrefix(fsBase, "~/") {
-			if home, err := os.UserHomeDir(); err == nil {
-				fsBase = filepath.Join(home, fsBase[2:])
-			}
-		}
-		fullPath := filepath.Join(fsBase, connector.Driver, dbName, encodedNS)
-		resURL = fmt.Sprintf("file://%s", filepath.ToSlash(fullPath))
-	} else {
-		// Generic scheme (mem://, vault://, gsecret://, ...)
-		// Ensure single trailing slash then append segments and .json suffix.
-		if !strings.HasSuffix(base, "/") {
-			base += "/"
-		}
-		resURL = fmt.Sprintf("%s%s/%s/%s.json", base, connector.Driver, dbName, encodedNS)
-	}
-
-	if metaCfg.CredType == reflect.TypeOf(&cred.Basic{}) {
-		connector.Secrets = scy.NewResource("", resURL, "blowfish://default")
+	if metaCfg.CredType == reflect.TypeOf(&cred.Basic{}) && (connector.Secrets == nil || connector.Secrets.URL == "") {
+		connector.Secrets = scy.NewResource("", s.defaultSecretURL(namespace, connector), "blowfish://default")
 	}
 
 	pend := &PendingSecret{
@@ -159,24 +133,46 @@ func (s *Service) GeneratePendingSecret(ctx context.Context, connector *Connecto
 	return pend, nil
 }
 
-// extractDBName attempts to derive the database name from the DSN string.
-// It supports common DSN formats (MySQL "user:pass@tcp(host)/dbname?params"
-// or URL style "postgres://user:pass@host/dbname?params"). When the database
-// name cannot be determined, the connector name is returned as a fallback to
-// maintain backward-compatible uniqueness.
-func extractDBName(dsn string) string {
-	if dsn == "" {
-		return "default"
+func (s *Service) secretExists(ctx context.Context, connector *Connector, credType reflect.Type) bool {
+	if connector == nil || connector.Secrets == nil || s.secrets == nil {
+		return false
 	}
-	// Trim trailing parameters if present.
-	trimmed := dsn
-	if idx := strings.Index(trimmed, "?"); idx != -1 {
-		trimmed = trimmed[:idx]
+	resource := *connector.Secrets
+	if credType != nil {
+		resource.SetTarget(credType)
 	}
-	// Remove a trailing slash if DSN ends with it.
-	trimmed = strings.TrimRight(trimmed, "/")
-	if idx := strings.LastIndex(trimmed, "/"); idx != -1 && idx+1 < len(trimmed) {
-		return trimmed[idx+1:]
+	_, err := s.secrets.Load(ctx, &resource)
+	return err == nil
+}
+
+func (s *Service) defaultSecretURL(namespace string, connector *Connector) string {
+	base := s.Config.SecretBaseLocation
+	if base == "" {
+		base = "mem://localhost/mcp-sqlkit/.secret/"
 	}
-	return "default"
+	encodedNS := url.PathEscape(namespace)
+	connectorName := "default"
+	driver := "unknown"
+	if connector != nil {
+		if connector.Name != "" {
+			connectorName = url.PathEscape(connector.Name)
+		}
+		if connector.Driver != "" {
+			driver = connector.Driver
+		}
+	}
+	if strings.HasPrefix(base, "file://") {
+		fsBase := strings.TrimPrefix(base, "file://")
+		if strings.HasPrefix(fsBase, "~/") {
+			if home, err := os.UserHomeDir(); err == nil {
+				fsBase = filepath.Join(home, fsBase[2:])
+			}
+		}
+		fullPath := filepath.Join(fsBase, driver, encodedNS, connectorName)
+		return fmt.Sprintf("file://%s", filepath.ToSlash(fullPath))
+	}
+	if !strings.HasSuffix(base, "/") {
+		base += "/"
+	}
+	return fmt.Sprintf("%s%s/%s/%s.json", base, driver, encodedNS, connectorName)
 }
