@@ -138,6 +138,9 @@ func (s *Service) secretExists(ctx context.Context, connector *Connector, credTy
 		return false
 	}
 	resource := *connector.Secrets
+	if err := normalizeSecretResourceURL(&resource); err != nil {
+		return false
+	}
 	if credType != nil {
 		resource.SetTarget(credType)
 	}

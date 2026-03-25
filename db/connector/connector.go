@@ -34,6 +34,7 @@ type Connector struct {
 }
 
 func (c *Connector) SetSecrets(secrets *scy.Service) {
+	_ = normalizeSecretResourceURL(c.Secrets)
 	c.secrets = secrets
 }
 func (c *Connector) ExpandDSN(ctx context.Context) (string, error) {
@@ -42,6 +43,9 @@ func (c *Connector) ExpandDSN(ctx context.Context) (string, error) {
 	}
 	if c.Secrets != nil {
 		resource := *c.Secrets
+		if err := normalizeSecretResourceURL(&resource); err != nil {
+			return "", err
+		}
 		resource.SetTarget(reflect.TypeOf(&cred.Basic{}))
 		if c.secrets == nil {
 			c.secrets = scy.New()
@@ -78,8 +82,11 @@ func (c *Connector) Db(ctx context.Context) (*sql.DB, error) {
 	if c.db != nil {
 		return c.db, nil
 	}
-	dsn, _ := c.ExpandDSN(ctx)
-	db, err := sql.Open(c.Driver, dsn)
+	dsn, err := c.ExpandDSN(ctx)
+	if err != nil {
+		return nil, err
+	}
+	db, err = sql.Open(c.Driver, dsn)
 	if err != nil {
 		return nil, err
 	}

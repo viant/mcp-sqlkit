@@ -7,6 +7,7 @@ import (
 	_ "modernc.org/sqlite" // register SQLite driver
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/viant/mcp-sqlkit/auth"
 	"github.com/viant/mcp-sqlkit/db/connector"
@@ -59,4 +60,41 @@ func TestService_Error(t *testing.T) {
 		outCol := metaSvc.ListColumns(ctx, &ListColumnsInput{Connector: tc.inputConn, Table: "users"})
 		assert.EqualValues(t, "ok", outCol.Status, tc.name)
 	}
+}
+
+func TestService_PreservesRequestedConnectorName(t *testing.T) {
+	cfg := &connector.Config{}
+	authSvc := auth.New(&policy.Policy{})
+	secrets := scy.New()
+	mgr := connector.NewManager(cfg, authSvc, secrets)
+	connSvc := connector.NewService(mgr, nil)
+	metaSvc := New(connSvc)
+
+	ctx := context.Background()
+	conn := &connector.Connector{
+		Name:   "testConn",
+		Driver: "sqlite",
+		DSN:    "file:memdb2?mode=memory&cache=shared",
+	}
+
+	pend, err := connSvc.GeneratePendingSecret(ctx, conn)
+	require.NoError(t, err)
+	pend.NS.Connectors.Put(conn.Name, conn)
+
+	db, err := conn.Db(ctx)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, "CREATE TABLE widgets(id INTEGER PRIMARY KEY, name TEXT);")
+	require.NoError(t, err)
+
+	inputTables := &ListTablesInput{Connector: "testConn"}
+	outTables := metaSvc.ListTables(ctx, inputTables)
+	require.Equal(t, "ok", outTables.Status)
+	assert.Equal(t, "testConn", outTables.Connector)
+	assert.Equal(t, "testConn", inputTables.Connector)
+
+	inputColumns := &ListColumnsInput{Connector: "testConn", Table: "widgets"}
+	outColumns := metaSvc.ListColumns(ctx, inputColumns)
+	require.Equal(t, "ok", outColumns.Status)
+	assert.Equal(t, "testConn", outColumns.Connector)
+	assert.Equal(t, "testConn", inputColumns.Connector)
 }

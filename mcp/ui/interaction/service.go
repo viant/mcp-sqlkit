@@ -373,6 +373,10 @@ func (s *Service) handlePost(w http.ResponseWriter, r *http.Request, pend *conne
 	pend.UserName = username
 
 	resource := pend.Connector.Secrets
+	if err := connector.NormalizeSecretResourceURL(resource); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	resource.SetTarget(reflect.TypeOf(basicCred))
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -492,6 +496,9 @@ func (s *Service) ensureGCPOauth2Client(pend *connector.PendingSecret, r *http.R
 		if pend.Connector.Secrets == nil {
 			pend.OAuth2Config = client.NewGCloud()
 		} else {
+			if err := connector.NormalizeSecretResourceURL(pend.Connector.Secrets); err != nil {
+				return err
+			}
 			pend.Connector.Secrets.SetTarget(pend.CredType)
 			secrets, err := s.Secrets.Load(r.Context(), pend.Connector.Secrets)
 			if err != nil {

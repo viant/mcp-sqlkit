@@ -99,13 +99,14 @@ func (s *Service) ListColumns(ctx context.Context, input *ListColumnsInput) *Col
 
 // listTables executes the metadata query and fills the output on success.
 func (s *Service) listTables(ctx context.Context, input *ListTablesInput, out *TablesOutput) error {
-	db, err := s.db(ctx, &input.Connector)
+	requestedConnector := input.Connector
+	db, err := s.db(ctx, requestedConnector)
 	if err != nil {
 		return err
 	}
 
 	if input.Schema == "" {
-		input.Schema = s.extractSchema(ctx, input.Connector)
+		input.Schema = s.extractSchema(ctx, requestedConnector)
 	}
 	m := metadata.New()
 	var tables []sink.Table
@@ -113,7 +114,7 @@ func (s *Service) listTables(ctx context.Context, input *ListTablesInput, out *T
 		return err
 	}
 
-	out.Connector = input.Connector
+	out.Connector = requestedConnector
 	out.Data = tables
 	return nil
 }
@@ -128,12 +129,13 @@ func (s *Service) extractSchema(ctx context.Context, connector string) string {
 
 // listColumns executes the metadata query and fills the output on success.
 func (s *Service) listColumns(ctx context.Context, input *ListColumnsInput, out *ColumnsOutput) error {
-	db, err := s.db(ctx, &input.Connector)
+	requestedConnector := input.Connector
+	db, err := s.db(ctx, requestedConnector)
 	if err != nil {
 		return err
 	}
 	if input.Schema == "" {
-		input.Schema = s.extractSchema(ctx, input.Connector)
+		input.Schema = s.extractSchema(ctx, requestedConnector)
 	}
 	m := metadata.New()
 	var columns []sink.Column
@@ -141,17 +143,16 @@ func (s *Service) listColumns(ctx context.Context, input *ListColumnsInput, out 
 		return err
 	}
 
-	out.Connector = input.Connector
+	out.Connector = requestedConnector
 	out.Data = columns
 	return nil
 }
 
 // db resolves the *sql.DB instance for a connector.
-func (s *Service) db(ctx context.Context, name *string) (*sql.DB, error) {
-	conn, err := s.connectors.Connection(ctx, *name)
+func (s *Service) db(ctx context.Context, name string) (*sql.DB, error) {
+	conn, err := s.connectors.Connection(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	*name = conn.Name
 	return conn.Db(ctx)
 }
