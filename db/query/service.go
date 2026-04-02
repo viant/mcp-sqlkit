@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -68,7 +69,7 @@ func (r *Service) query(ctx context.Context, input *Input, output *Output) error
 	}
 
 	return reader.QueryAll(ctx, func(row interface{}) error {
-		output.Data = append(output.Data, row)
+		output.Data = append(output.Data, materializeRow(row))
 		return nil
 	}, input.Parameters...)
 }
@@ -186,4 +187,103 @@ func sanitizeIdentifier(s string) string {
 		return "X"
 	}
 	return b.String()
+}
+
+var timeType = reflect.TypeOf(time.Time{})
+
+func materializeRow(row interface{}) interface{} {
+	if row == nil {
+		return nil
+	}
+
+	value := reflect.ValueOf(row)
+	return materializeValue(value)
+}
+
+func materializeValue(value reflect.Value) interface{} {
+	if !value.IsValid() {
+		return nil
+	}
+
+	switch value.Kind() {
+	case reflect.Interface, reflect.Pointer:
+		if value.IsNil() {
+			return nil
+		}
+		return materializeValue(value.Elem())
+	case reflect.String:
+		return strings.Clone(value.String())
+	case reflect.Slice:
+		if value.IsNil() {
+			return nil
+		}
+		if value.Type().Elem().Kind() == reflect.Uint8 {
+			return append([]byte(nil), value.Bytes()...)
+		}
+		result := make([]interface{}, value.Len())
+		for i := 0; i < value.Len(); i++ {
+			result[i] = materializeValue(value.Index(i))
+		}
+		return result
+	case reflect.Array:
+		result := make([]interface{}, value.Len())
+		for i := 0; i < value.Len(); i++ {
+			result[i] = materializeValue(value.Index(i))
+		}
+		return result
+	case reflect.Map:
+		if value.IsNil() {
+			return nil
+		}
+		if value.Type().Key().Kind() != reflect.String {
+			return value.Interface()
+		}
+		result := make(map[string]interface{}, value.Len())
+		iter := value.MapRange()
+		for iter.Next() {
+			result[strings.Clone(iter.Key().String())] = materializeValue(iter.Value())
+		}
+		return result
+	case reflect.Struct:
+		if value.Type() == timeType {
+			return value.Interface()
+		}
+		return materializeStruct(value)
+	default:
+		return value.Interface()
+	}
+}
+
+func materializeStruct(value reflect.Value) map[string]interface{} {
+	result := make(map[string]interface{}, value.NumField())
+	valueType := value.Type()
+	for i := 0; i < value.NumField(); i++ {
+		field := valueType.Field(i)
+		if field.PkgPath != "" {
+			continue
+		}
+		result[fieldOutputName(field)] = materializeValue(value.Field(i))
+	}
+	return result
+}
+
+func fieldOutputName(field reflect.StructField) string {
+	if sqlxName := tagName(field.Tag.Get("sqlx")); sqlxName != "" {
+		return sqlxName
+	}
+	if jsonName := tagName(field.Tag.Get("json")); jsonName != "" {
+		return jsonName
+	}
+	return field.Name
+}
+
+func tagName(tag string) string {
+	if tag == "" {
+		return ""
+	}
+	name := strings.Split(tag, ",")[0]
+	if name == "" || name == "-" {
+		return ""
+	}
+	return name
 }
