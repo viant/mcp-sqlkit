@@ -27,6 +27,7 @@ func (s *Service) List(ctx context.Context) []*Connector {
 	if err != nil || namespace == "" {
 		namespace = "default"
 	}
+	s.logNamespaceConnectors(namespace)
 	ns, ok := s.namespace.Get(namespace)
 	if !ok {
 		return nil

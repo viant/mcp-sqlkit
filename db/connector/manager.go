@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"github.com/viant/jsonrpc"
 	"github.com/viant/mcp-protocol/schema"
+	"log"
 	"reflect"
+	"sort"
+	"strings"
 
 	"github.com/viant/mcp-sqlkit/auth"
 	"github.com/viant/mcp-sqlkit/db/connector/meta"
@@ -88,6 +91,7 @@ func (c *Manager) Connection(ctx context.Context, name string) (*Connector, erro
 	if err != nil {
 		return nil, err
 	}
+	c.logNamespaceConnectors(namespace)
 	ns, ok := c.namespace.Get(namespace)
 	if !ok {
 		return nil, ErrNamespaceNotFound
@@ -97,6 +101,37 @@ func (c *Manager) Connection(ctx context.Context, name string) (*Connector, erro
 		return nil, ErrConnectorNotFound
 	}
 	return conn, nil
+}
+
+func (c *Manager) logNamespaceConnectors(namespace string) {
+	if c == nil {
+		return
+	}
+
+	ns, ok := c.namespace.Get(namespace)
+	if !ok || ns == nil {
+		log.Printf("mcp-sqlkit connectors namespace=%q connectors=[]", namespace)
+		return
+	}
+
+	connectors := ns.Connectors.Values()
+	if len(connectors) == 0 {
+		log.Printf("mcp-sqlkit connectors namespace=%q connectors=[]", namespace)
+		return
+	}
+
+	sort.Slice(connectors, func(i, j int) bool {
+		return connectors[i].Name < connectors[j].Name
+	})
+
+	items := make([]string, 0, len(connectors))
+	for _, conn := range connectors {
+		if conn == nil {
+			continue
+		}
+		items = append(items, fmt.Sprintf("{name:%q dsn:%q}", conn.Name, conn.DSN))
+	}
+	log.Printf("mcp-sqlkit connectors namespace=%q connectors=[%s]", namespace, strings.Join(items, " "))
 }
 
 // matchMeta selects meta.Config matching a driver or default one.
