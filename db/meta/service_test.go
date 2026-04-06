@@ -13,6 +13,7 @@ import (
 	"github.com/viant/mcp-sqlkit/db/connector"
 	"github.com/viant/mcp-sqlkit/policy"
 	"github.com/viant/scy"
+	"github.com/viant/sqlx/option"
 )
 
 // TestService_Error verifies that the service returns an error status when the
@@ -97,4 +98,19 @@ func TestService_PreservesRequestedConnectorName(t *testing.T) {
 	require.Equal(t, "ok", outColumns.Status)
 	assert.Equal(t, "testConn", outColumns.Connector)
 	assert.Equal(t, "testConn", inputColumns.Connector)
+}
+
+func TestService_MetadataOptionsUsesBigQueryProduct(t *testing.T) {
+	service := &Service{}
+	conn := &connector.Connector{Driver: "bigquery"}
+
+	options := service.metadataOptions(conn, "", "ci_ads")
+	product := option.Options(options).Product()
+
+	require.NotNil(t, product)
+	assert.Equal(t, "BigQuery", product.Name)
+
+	args, ok := options[0].(*option.Args)
+	require.True(t, ok)
+	require.Equal(t, 2, args.Size())
 }

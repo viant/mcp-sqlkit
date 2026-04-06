@@ -6,6 +6,7 @@ type Options struct {
 	Stdio                 bool   `short:"s" long:"stdio" description:"Enable stdio transport"`
 	ConfigPath            string `short:"c" long:"config" description:"Path to JSON configuration file"`
 	DefaultConnectorsPath string `short:"d" long:"default-connectors" description:"Path to JSON file containing default connectors only (either an array of namespaced connector entries or an object with connector.defaultConnectors)"`
+	MemoryReportSeconds   int    `long:"mem-report-seconds" description:"Log Go memory stats every N seconds (0 disables)"`
 
 	// Return tool results using the `data` field instead of the default
 	// `text` field (negates the config's default behaviour).

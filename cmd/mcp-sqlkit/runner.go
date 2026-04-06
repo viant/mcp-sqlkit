@@ -63,6 +63,7 @@ func run(argv []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	startMemoryReporter(ctx, time.Duration(opts.MemoryReportSeconds)*time.Second)
 	httpSrv := startHTTP(ctx, srv, opts.HTTPAddr)
 	stdioCh := startStdio(ctx, srv, opts.Stdio)
 
