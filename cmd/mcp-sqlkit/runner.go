@@ -58,6 +58,9 @@ func run(argv []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to build server: %w", err)
 	}
+	// Prefer streamable HTTP for the MCP transport so `/mcp` is the primary
+	// endpoint and root redirect targets it by default. SSE remains mounted.
+	srv.UseStreamableHTTP(true)
 
 	// 4. Start transports ---------------------------------------------------
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

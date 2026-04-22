@@ -10,7 +10,6 @@ import (
 
 	"github.com/viant/mcp-sqlkit/db/connector"
 	"github.com/viant/mcp-sqlkit/db/exec"
-	"github.com/viant/mcp-sqlkit/db/meta"
 	"github.com/viant/mcp-sqlkit/db/query"
 )
 
@@ -28,11 +27,12 @@ var dbListConnectionsDesc string
 //go:embed descriptions/dbSetConnection.md
 var dbSetConnectionDesc string
 
-//go:embed descriptions/dbListTables.md
-var dbListTablesDesc string
-
-//go:embed descriptions/dbListColumns.md
-var dbListColumnsDesc string
+//
+////go:embed descriptions/dbListTables.md
+//var dbListTablesDesc string
+//
+////go:embed descriptions/dbListColumns.md
+//var dbListColumnsDesc string
 
 func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 	// Register query tool
@@ -81,26 +81,26 @@ func registerTools(base *protoserver.DefaultHandler, ret *Handler) error {
 		return err
 	}
 
-	// Register list tables tool
-	if err := protoserver.RegisterTool[*meta.ListTablesInput, *meta.TablesOutput](base.Registry, "dbListTables", dbListTablesDesc, func(ctx context.Context, input *meta.ListTablesInput) (*schema.CallToolResult, *jsonrpc.Error) {
-		out := ret.meta.ListTables(ctx, input)
-		if out.Status == "error" {
-			return buildErrorResult(out.Error)
-		}
-		return buildSuccessResult(ret.service, out)
-	}); err != nil {
-		return err
-	}
-
-	// Register list columns tool
-	if err := protoserver.RegisterTool[*meta.ListColumnsInput, *meta.ColumnsOutput](base.Registry, "dbListColumns", dbListColumnsDesc, func(ctx context.Context, input *meta.ListColumnsInput) (*schema.CallToolResult, *jsonrpc.Error) {
-		out := ret.meta.ListColumns(ctx, input)
-		if out.Status == "error" {
-			return buildErrorResult(out.Error)
-		}
-		return buildSuccessResult(ret.service, out)
-	}); err != nil {
-		return err
-	}
+	//// Register list tables tool
+	//if err := protoserver.RegisterTool[*meta.ListTablesInput, *meta.TablesOutput](base.Registry, "dbListTables", dbListTablesDesc, func(ctx context.Context, input *meta.ListTablesInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	//	out := ret.meta.ListTables(ctx, input)
+	//	if out.Status == "error" {
+	//		return buildErrorResult(out.Error)
+	//	}
+	//	return buildSuccessResult(ret.service, out)
+	//}); err != nil {
+	//	return err
+	//}
+	//
+	//// Register list columns tool
+	//if err := protoserver.RegisterTool[*meta.ListColumnsInput, *meta.ColumnsOutput](base.Registry, "dbListColumns", dbListColumnsDesc, func(ctx context.Context, input *meta.ListColumnsInput) (*schema.CallToolResult, *jsonrpc.Error) {
+	//	out := ret.meta.ListColumns(ctx, input)
+	//	if out.Status == "error" {
+	//		return buildErrorResult(out.Error)
+	//	}
+	//	return buildSuccessResult(ret.service, out)
+	//}); err != nil {
+	//	return err
+	//}
 	return nil
 }

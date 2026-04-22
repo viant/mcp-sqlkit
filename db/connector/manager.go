@@ -70,10 +70,26 @@ func (c *Manager) initDefaultConnectors() {
 			// Ensure connectors are linked with the shared secrets service.
 			conn.SetSecrets(c.secrets)
 
-			// Persist secret if provided and pointing to local resource but not yet stored.
-			if conn.Secrets != nil {
-				if _, err := c.secrets.Load(context.Background(), conn.Secrets); err != nil {
-					// ignore missing secret – connector will require secret elicitation later.
+			// Validate default connector secrets eagerly using the same credential
+			// type that runtime DSN expansion will require. This keeps bootstrap
+			// behaviour aligned with dbSetConnection/dbQuery and makes broken
+			// secret references visible in logs instead of silently deferring them.
+			if conn.Secrets != nil && c.secrets != nil {
+				resource := *conn.Secrets
+				if err := normalizeSecretResourceURL(&resource); err != nil {
+					log.Printf("mcp-sqlkit default connector name=%q driver=%q secret normalize error: %v", conn.Name, conn.Driver, err)
+				} else {
+					metaCfg := c.matchMeta(conn.Driver)
+					if metaCfg != nil && metaCfg.CredType != nil {
+						resource.SetTarget(metaCfg.CredType)
+					}
+					if _, err := c.secrets.Load(context.Background(), &resource); err != nil {
+						log.Printf("mcp-sqlkit default connector name=%q driver=%q secret load error: %v", conn.Name, conn.Driver, err)
+					} else if _, err := conn.ExpandDSN(context.Background()); err != nil {
+						log.Printf("mcp-sqlkit default connector name=%q driver=%q dsn expansion error: %v", conn.Name, conn.Driver, err)
+					} else {
+						log.Printf("mcp-sqlkit default connector name=%q driver=%q secret ready", conn.Name, conn.Driver)
+					}
 				}
 			}
 
